@@ -23,7 +23,8 @@ title: NeuroSky MindWave Mobile Android SDK — Developer Guide
 12. [Error Handling & Reconnection](#12-error-handling--reconnection)
 13. [Advanced Patterns](#13-advanced-patterns)
 14. [Troubleshooting](#14-troubleshooting)
-15. [API Reference](#15-api-reference)
+15. [Testing](#15-testing)
+16. [API Reference](#16-api-reference)
 
 ---
 
@@ -844,7 +845,49 @@ class EegForegroundService : Service() {
 
 ---
 
-## 15. API Reference
+## 15. Testing
+
+The SDK ships with a unit test suite for `ThinkGearParser` — the packet parser that runs identically on both BLE and BT Classic transports. These tests require no hardware or Bluetooth adapter and run on the JVM directly.
+
+### Running the tests
+
+```bash
+./gradlew :sdk:test
+```
+
+Test results are written to:
+
+```
+sdk/build/reports/tests/testDebugUnitTest/index.html
+```
+
+### What is covered
+
+| Test | Description |
+|---|---|
+| `parseEsense_0xEA` | Attention, Meditation, PoorSignal extraction |
+| `parseEsense_0xEA_tooShort` | Short packet → returns null |
+| `parseEsense_0xEB` | Delta, Theta, LowAlpha, HighAlpha extraction |
+| `parseEsense_0xEC` | LowBeta, HighBeta, LowGamma, MidGamma extraction |
+| `parseRawEeg_returns10Samples` | 20-byte raw EEG → 10 signed int samples |
+| `parseRawEeg_signedConversion` | Values > 32768 converted to negative |
+| `parseRawEeg_tooShort` | Short packet → returns null |
+| `parse_unknownUuid` | Unknown UUID → returns null |
+| `parseByte_validPacket` | BT Classic serial packet — Attention/Meditation |
+| `parseByte_invalidChecksum` | Wrong checksum → returns null |
+| `parseByte_poorSignalCode` | BT Classic PoorSignal (code 0x02) |
+| `signalQuality_*` | 200/100/25/0 → NO_SIGNAL/POOR/FAIR/GOOD |
+
+### Test location
+
+```
+sdk/src/test/kotlin/com/neurosky/sdk/parser/
+└── ThinkGearParserTest.kt
+```
+
+---
+
+## 16. API Reference
 
 ### `NeuroSkySdk`
 
