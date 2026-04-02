@@ -2,6 +2,7 @@
 
 [![JitPack](https://jitpack.io/v/nsk-bci/mindwave-sdk-android.svg)](https://jitpack.io/#nsk-bci/mindwave-sdk-android)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Android](https://img.shields.io/badge/Android-API%2023%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Modern Kotlin SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic, no TGC dependency.
