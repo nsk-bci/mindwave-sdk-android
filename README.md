@@ -5,8 +5,17 @@ Modern Kotlin SDK for NeuroSky MindWave EEG headsets — BLE + BT Classic, no TG
 ## Installation
 
 ```kotlin
-// build.gradle.kts
-implementation("com.neurosky:mindwave-sdk:2.0.0")
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+
+// app/build.gradle.kts
+implementation("com.github.nsk-bci:mindwave-sdk-android:v2.0.1")
 ```
 
 ## Quick Start
@@ -15,7 +24,7 @@ implementation("com.neurosky:mindwave-sdk:2.0.0")
 val sdk = NeuroSkySdk(context)
 
 lifecycleScope.launch {
-    sdk.connect("MindWave Mobile")  // BLE 우선, 실패 시 BT Classic 자동 폴백
+    sdk.connect("MindWave Mobile")  // BLE first, falls back to BT Classic automatically
 
     sdk.dataFlow.collect { data ->
         println("Attention:  ${data.attention}")
@@ -25,7 +34,7 @@ lifecycleScope.launch {
 }
 ```
 
-## Simulator (실기기 없이 개발)
+## Simulator (without a real device)
 
 ```kotlin
 val simulator = SimulatorTransport()
@@ -39,21 +48,21 @@ lifecycleScope.launch {
 
 ## Transport
 
-| Transport | 연결 방식 | 조건 |
+| Transport | Method | Requirement |
 |---|---|---|
 | BleTransport | BLE GATT | Android 5.0+ |
-| BtClassicTransport | RFCOMM SPP | 페어링 필요 |
-| SimulatorTransport | 가상 데이터 | 개발/테스트용 |
+| BtClassicTransport | RFCOMM SPP | Paired device required |
+| SimulatorTransport | Virtual data | For development/testing |
 
 ## BrainWaveData
 
-| 필드 | 범위 | 설명 |
+| Field | Range | Description |
 |---|---|---|
-| `poorSignal` | 0~200 | 0=완벽, 200=무신호 |
-| `attention` | 0~100 | 집중도 |
-| `meditation` | 0~100 | 명상 |
-| `delta` ~ `midGamma` | 0~... | EEG 주파수 파워 |
-| `rawEeg` | List<Int> | 10샘플/패킷 (512Hz) |
+| `poorSignal` | 0~200 | 0=perfect, 200=no signal |
+| `attention` | 0~100 | Attention level |
+| `meditation` | 0~100 | Meditation level |
+| `delta` ~ `midGamma` | 0~... | EEG frequency power |
+| `rawEeg` | List<Int> | 10 samples/packet (512Hz) |
 | `signalQuality` | enum | GOOD/FAIR/POOR/NO_SIGNAL |
 
 ## Permissions
@@ -64,7 +73,7 @@ lifecycleScope.launch {
     android:usesPermissionFlags="neverForLocation" />
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-<!-- Android 11 이하 -->
+<!-- Android 11 and below -->
 <uses-permission android:name="android.permission.BLUETOOTH" />
 <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
