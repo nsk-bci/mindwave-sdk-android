@@ -195,7 +195,6 @@ sdk/src/main/kotlin/com/neurosky/sdk/
 - Published to JitPack
 
 ### v2.0.0
-- Removed TGC (ThinkGear Connector) dependency entirely
 - Android BLE GATT implementation
 - Android RFCOMM SPP implementation
 - Auto-fallback: BLE → BT Classic
