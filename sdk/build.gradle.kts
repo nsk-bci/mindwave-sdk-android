@@ -1,7 +1,7 @@
 plugins {
     id("com.android.library")
     kotlin("android")
-    id("com.vanniktech.maven.publish")
+    id("maven-publish")
 }
 
 android {
@@ -37,40 +37,15 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
 
-mavenPublishing {
-    // Sonatype Central Portal 사용 (신 포털, 2024+)
-    // OSSRH_USERNAME, OSSRH_PASSWORD 환경변수로 인증
-    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
-
-    // SIGNING_KEY, SIGNING_PASSWORD 환경변수로 GPG 서명
-    signAllPublications()
-
-    coordinates("io.github.nsk-bci", "mindwave-sdk", "2.0.0")
-
-    pom {
-        name.set("NeuroSky MindWave SDK")
-        description.set("Modern Kotlin SDK for NeuroSky MindWave EEG headsets — BLE + BT Classic, no TGC dependency")
-        url.set("https://github.com/nsk-bci/mindwave-sdk-android")
-
-        licenses {
-            license {
-                name.set("Apache License 2.0")
-                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+                groupId = "com.github.nsk-bci"
+                artifactId = "mindwave-sdk-android"
+                version = "2.0.0"
             }
-        }
-
-        developers {
-            developer {
-                id.set("nsk-bci")
-                name.set("nsk-bci")
-                url.set("https://github.com/nsk-bci")
-            }
-        }
-
-        scm {
-            connection.set("scm:git:git://github.com/nsk-bci/mindwave-sdk-android.git")
-            developerConnection.set("scm:git:ssh://github.com/nsk-bci/mindwave-sdk-android.git")
-            url.set("https://github.com/nsk-bci/mindwave-sdk-android")
         }
     }
 }
