@@ -1,75 +1,121 @@
 package com.neurosky.sample
 
 import android.Manifest
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
-import com.neurosky.sdk.NeuroSkySdk
-import com.neurosky.sdk.NeuroSkyCommand
+import com.google.android.material.button.MaterialButton
+import com.neurosky.sample.databinding.ActivityMainBinding
+import com.neurosky.sdk.model.BrainWaveData
+import com.neurosky.sdk.model.SignalQuality
 import com.neurosky.sdk.simulator.SimulatorTransport
-import com.neurosky.sdk.transport.ConnectionState
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
-    // 실기기 테스트: NeuroSkySdk(this)
-    // 시뮬레이터 테스트: SimulatorTransport 직접 사용
-    private val sdk = NeuroSkySdk(this)
+    private lateinit var binding: ActivityMainBinding
     private val simulator = SimulatorTransport()
+    private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         requestBluetoothPermissions()
+        setupModeButtons()
 
-        val tvStatus    = findViewById<TextView>(R.id.tvStatus)
-        val tvAttention = findViewById<TextView>(R.id.tvAttention)
-        val tvMeditation= findViewById<TextView>(R.id.tvMeditation)
-        val tvSignal    = findViewById<TextView>(R.id.tvSignal)
-
-        // 시뮬레이터로 UI 검증
+        // Start simulator with Focused mode as default
         simulator.setMode(SimulatorTransport.Mode.FOCUSED)
+        lifecycleScope.launch { simulator.connect("simulator") }
         lifecycleScope.launch {
-            launch {
-                simulator.connect("simulator")
-            }
-            simulator.dataFlow.collect { data ->
-                runOnUiThread {
-                    tvStatus.text     = "Signal: ${data.signalQuality}"
-                    tvAttention.text  = "Attention: ${data.attention}"
-                    tvMeditation.text = "Meditation: ${data.meditation}"
-                    tvSignal.text     = "PoorSignal: ${data.poorSignal}"
-                }
-            }
+            simulator.dataFlow.collect { data -> updateUI(data) }
         }
 
-        // 실기기 연결 예시 (주석 해제 후 사용)
-        /*
-        lifecycleScope.launch {
-            sdk.connectionState.collect { state ->
-                runOnUiThread { tvStatus.text = "State: $state" }
-                if (state == ConnectionState.CONNECTED) {
-                    sdk.sendCommand(NeuroSkyCommand.NOTCH_60HZ)
-                }
+        highlightActiveMode(binding.btnFocused)
+    }
+
+    private fun setupModeButtons() {
+        val modeMap = mapOf(
+            binding.btnRandom    to SimulatorTransport.Mode.RANDOM,
+            binding.btnFocused   to SimulatorTransport.Mode.FOCUSED,
+            binding.btnRelaxed   to SimulatorTransport.Mode.RELAXED,
+            binding.btnPoorSignal to SimulatorTransport.Mode.POOR_SIGNAL
+        )
+        modeMap.forEach { (btn, mode) ->
+            btn.setOnClickListener {
+                simulator.setMode(mode)
+                highlightActiveMode(btn)
             }
         }
-        lifecycleScope.launch {
-            sdk.connect("MindWave Mobile")
-        }
-        lifecycleScope.launch {
-            sdk.dataFlow.collect { data ->
-                runOnUiThread {
-                    tvAttention.text  = "Attention: ${data.attention}"
-                    tvMeditation.text = "Meditation: ${data.meditation}"
-                    tvSignal.text     = "Signal: ${data.signalQuality}"
-                }
+    }
+
+    private fun highlightActiveMode(active: MaterialButton) {
+        val allButtons = listOf(
+            binding.btnRandom, binding.btnFocused,
+            binding.btnRelaxed, binding.btnPoorSignal
+        )
+        val primaryColor = getColor(R.color.colorPrimary)
+        allButtons.forEach { btn ->
+            if (btn == active) {
+                btn.setBackgroundColor(primaryColor)
+                btn.setTextColor(Color.WHITE)
+                btn.strokeWidth = 0
+            } else {
+                btn.setBackgroundColor(Color.TRANSPARENT)
+                btn.setTextColor(primaryColor)
+                btn.strokeColor = android.content.res.ColorStateList.valueOf(primaryColor)
+                btn.strokeWidth = 2
             }
         }
-        */
+    }
+
+    private fun updateUI(data: BrainWaveData) {
+        // Signal quality
+        val (dotColorRes, qualityText) = when (data.signalQuality) {
+            SignalQuality.GOOD      -> Pair(R.color.signalGood, "GOOD")
+            SignalQuality.FAIR      -> Pair(R.color.signalFair, "FAIR")
+            SignalQuality.POOR      -> Pair(R.color.signalPoor, "POOR")
+            SignalQuality.NO_SIGNAL -> Pair(R.color.signalNone, "NO SIGNAL")
+        }
+        val dotColor = getColor(dotColorRes)
+        binding.viewDot.background.setTint(dotColor)
+        binding.tvQuality.text = qualityText
+        binding.tvQuality.setTextColor(dotColor)
+        binding.tvPoorSignal.text = "Poor Signal: ${data.poorSignal}"
+
+        // eSense
+        binding.tvAttention.text = "${data.attention}"
+        binding.progressAttention.progress = data.attention
+        binding.tvMeditation.text = "${data.meditation}"
+        binding.progressMeditation.progress = data.meditation
+
+        // EEG bands (raw values up to ~100k)
+        binding.progressDelta.progress    = data.delta.coerceAtMost(100_000)
+        binding.tvDelta.text              = "%,d".format(data.delta)
+        binding.progressTheta.progress    = data.theta.coerceAtMost(100_000)
+        binding.tvTheta.text              = "%,d".format(data.theta)
+        binding.progressLowAlpha.progress = data.lowAlpha.coerceAtMost(100_000)
+        binding.tvLowAlpha.text           = "%,d".format(data.lowAlpha)
+        binding.progressHighAlpha.progress = data.highAlpha.coerceAtMost(100_000)
+        binding.tvHighAlpha.text           = "%,d".format(data.highAlpha)
+        binding.progressLowBeta.progress  = data.lowBeta.coerceAtMost(100_000)
+        binding.tvLowBeta.text            = "%,d".format(data.lowBeta)
+        binding.progressHighBeta.progress = data.highBeta.coerceAtMost(100_000)
+        binding.tvHighBeta.text           = "%,d".format(data.highBeta)
+        binding.progressLowGamma.progress = data.lowGamma.coerceAtMost(100_000)
+        binding.tvLowGamma.text           = "%,d".format(data.lowGamma)
+        binding.progressMidGamma.progress = data.midGamma.coerceAtMost(100_000)
+        binding.tvMidGamma.text           = "%,d".format(data.midGamma)
+
+        // Timestamp
+        binding.tvUpdated.text = "Updated: ${timeFormat.format(Date(data.timestamp))}"
     }
 
     private fun requestBluetoothPermissions() {
@@ -90,6 +136,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        lifecycleScope.launch { sdk.disconnect() }
+        lifecycleScope.launch { simulator.disconnect() }
     }
 }

@@ -17,7 +17,7 @@
         android:allowBackup="true"
         android:label="NeuroSky Sample"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+        android:theme="@style/Theme.NeuroskyDemo">
 
         <activity
             android:name=".MainActivity"

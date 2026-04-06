@@ -11,6 +11,9 @@ Modern Kotlin SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic
 
 ## Getting Started
 
+> **Developer Guide:** [docs/developer-guide.pdf](docs/developer-guide.pdf)  
+> Full architecture walkthrough, connection flow diagrams, signal quality handling, and advanced usage patterns.
+
 ### Step 1 — Add JitPack to repositories
 
 ```kotlin
@@ -51,20 +54,27 @@ dependencies {
 
 > On Android 12+, runtime permission prompts for `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` are required before connecting.
 
-### Step 4 — Connect and stream
+### Step 4 — Find your device address
+
+`connect()` takes a Bluetooth MAC address. Use `findDeviceAddress()` once on first launch to discover it, then cache it locally for faster subsequent connections.
 
 ```kotlin
-import com.neurosky.sdk.NeuroSkySdk
-import com.neurosky.sdk.NeuroSkyCommand
-
 val sdk = NeuroSkySdk(context)
+val prefs = getSharedPreferences("ns_sdk", MODE_PRIVATE)
 
 lifecycleScope.launch {
-    sdk.connect("MindWave Mobile")  // BLE first, falls back to BT Classic automatically
+    val cached = prefs.getString("device_mac", null)
+    val address = cached ?: sdk.findDeviceAddress("MindWave Mobile")?.also { mac ->
+        prefs.edit().putString("device_mac", mac).apply()  // cache — skips scan next launch
+    }
 
-    // Set notch filter for your region (removes power-line noise)
-    sdk.sendCommand(NeuroSkyCommand.NOTCH_60HZ)  // Korea/USA
-    // sdk.sendCommand(NeuroSkyCommand.NOTCH_50HZ)  // Europe/China
+    if (address == null) {
+        // device not found within 10 s — check power and permissions
+        return@launch
+    }
+
+    sdk.connect(address)
+    sdk.sendCommand(NeuroSkyCommand.NOTCH_60HZ)  // Korea/USA; use NOTCH_50HZ for Europe/China
 
     sdk.dataFlow.collect { data ->
         println("Attention  : ${data.attention}")
@@ -75,8 +85,6 @@ lifecycleScope.launch {
 ```
 
 That's it — four steps from zero to streaming EEG data.
-
-> **Need more detail?** See the full [Developer Guide](docs/developer-guide.pdf) for architecture, all connection modes, signal quality handling, advanced patterns, and the complete API reference.
 
 ---
 
@@ -151,6 +159,57 @@ lifecycleScope.launch {
 | `eyeBlink` | `Int` | 0~255 | Eye blink intensity |
 | `signalQuality` | `SignalQuality` | enum | NO_SIGNAL/POOR/FAIR/GOOD |
 
+## Working with dataFlow
+
+### Packet timing
+
+BLE 모드에서는 두 characteristic이 서로 다른 속도로 패킷을 전송합니다.
+
+| Characteristic | 포함 필드 | 전송 주기 |
+|---|---|---|
+| eSense `039afff8` | attention, meditation, EEG bands | ~1 Hz |
+| RawEEG `039afff4` | `rawEeg` (10샘플) | ~51 Hz (512 Hz ÷ 10) |
+
+`ThinkGearParser`는 상태를 누적합니다. 어느 characteristic이 트리거했든 emit된 `BrainWaveData`는 모든 필드의 **최신 누적값**을 담습니다.
+
+### 주의 — `attention` 기반 필터
+
+```kotlin
+// 잘못된 패턴 — rawEEG 전용 세션에서 모든 패킷이 버려짐
+sdk.dataFlow
+    .filter { it.attention > 0 }  // eSense가 꺼져 있으면 attention은 항상 0
+    .collect { ... }
+```
+
+`STOP_ESENSE`를 보내거나 `START_ESENSE`를 호출하지 않으면 디바이스는 attention 데이터를 보내지 않습니다. `attention`이 0으로 고정되어 위 필터는 모든 패킷을 무음으로 폐기합니다.
+
+**올바른 패턴:**
+
+```kotlin
+// eSense 세션 — 값이 아닌 신호 품질로 필터
+sdk.dataFlow
+    .filter { it.signalQuality != SignalQuality.NO_SIGNAL }
+    .collect { data ->
+        println("Attention: ${data.attention}")
+    }
+
+// rawEEG 전용 세션
+sdk.sendCommand(NeuroSkyCommand.STOP_ESENSE)
+sdk.sendCommand(NeuroSkyCommand.START_RAW_EEG)
+sdk.dataFlow
+    .filter { it.rawEeg.isNotEmpty() }
+    .collect { data ->
+        data.rawEeg.forEach { sample -> processRawSample(sample) }
+    }
+
+// eSense + rawEEG 동시 사용 — 각 패킷에서 채워진 필드만 처리
+sdk.sendCommand(NeuroSkyCommand.START_RAW_EEG)  // eSense는 기본 활성
+sdk.dataFlow.collect { data ->
+    if (data.rawEeg.isNotEmpty()) processRawSamples(data.rawEeg)
+    if (data.attention > 0)       updateEsenseUI(data)
+}
+```
+
 ## Commands
 
 ```kotlin
@@ -171,6 +230,26 @@ sdk.sendCommand(NeuroSkyCommand.STOP_RAW_EEG)
 | `BtClassicTransport` | RFCOMM SPP | Paired device in Android Settings |
 | `SimulatorTransport` | Virtual data | For development/testing |
 
+## ProGuard / R8
+
+The SDK ships consumer ProGuard rules (`consumer-rules.pro`) via `consumerProguardFiles` — **no action required** in most apps.
+
+If you maintain your own rules and override the SDK's, add at minimum:
+
+```proguard
+# BLE GATT callbacks — Android BLE stack calls these by name via reflection.
+# Omitting this causes BLE data to stop silently in release builds.
+-keep class * extends android.bluetooth.BluetoothGattCallback {
+    public void onConnectionStateChange(...);
+    public void onServicesDiscovered(...);
+    public void onDescriptorWrite(...);
+    public void onCharacteristicChanged(...);
+}
+-keep class com.neurosky.sdk.** { *; }
+```
+
+> **Symptom of missing rules:** the app works perfectly in debug but receives no EEG data after a release build.
+
 ## Project Structure
 
 ```
@@ -189,18 +268,54 @@ sdk/src/main/kotlin/com/neurosky/sdk/
     └── SimulatorTransport.kt   Simulator for development
 ```
 
+## Troubleshooting
+
+### JitPack dependency not resolving
+
+JitPack은 첫 요청 시 빌드를 시작합니다(1–3분 소요). Gradle 싱크가 즉시 실패하면 아래 순서로 확인하세요.
+
+**1. 빌드 로그 확인**
+
+```
+https://jitpack.io/com/github/nsk-bci/mindwave-sdk-android/v2.0.1/build.log
+```
+
+**2. 빌드 진행 중** — 로그에 "build in progress"가 표시되면 2–3분 후 Gradle 싱크 재시도.
+
+**3. 빌드 실패** — 주요 원인:
+
+| 원인 | 해결 방법 |
+|---|---|
+| Gradle 버전 불일치 | 로그의 에러 메시지 확인, 저장소 `gradle-wrapper.properties`와 비교 |
+| Rate limit / 캐시 만료 | 버전 태그 대신 전체 커밋 SHA 사용 |
+| 첫 빌드 실패 후 캐시됨 | 버전을 최신 태그 또는 커밋 SHA로 변경해 강제 재빌드 |
+
+```kotlin
+// 커밋 SHA로 강제 지정 (태그 캐시 우회)
+implementation("com.github.nsk-bci:mindwave-sdk-android:FULL_COMMIT_SHA")
+```
+
+**4. Android Studio Offline 모드** — `File → Settings → Build → Gradle` 에서 *Offline work* 체크 해제.
+
+---
+
 ## Changelog
 
 ### v2.0.1
-- Published to JitPack
+- `NeuroSkySdk.findDeviceAddress(name, timeoutMs)` 추가 — BLE 스캔으로 디바이스 이름 → MAC 주소 반환, 결과 캐시 권장
+- `sdk/consumer-rules.pro` 추가 — `BluetoothGattCallback` 5개 메서드 + 공개 API 클래스 R8 난독화 방지
+- JitPack 배포 설정 — `settings.gradle.kts` `dependencyResolutionManagement` + JitPack 저장소 등록
+- Sample 앱 UI 전면 개편 — MaterialCardView 기반 4-카드 레이아웃 (Signal Status / eSense / EEG Bands / Simulator Mode)
+- README: Developer Guide 링크 상단 이동, MAC 주소 획득 패턴, ProGuard 섹션 추가
 
 ### v2.0.0
-- Android BLE GATT implementation
-- Android RFCOMM SPP implementation
-- Auto-fallback: BLE → BT Classic
-- `Flow<BrainWaveData>` stream API
-- Simulator modes: RANDOM / FOCUSED / RELAXED / POOR_SIGNAL
-- Kotlin 1.9, Coroutines 1.7
+- BLE GATT Transport (`BleTransport`) — `connectGatt()` → CCCD 구독 → Handshake(`0x17`) → 데이터 수신
+- BT Classic SPP Transport (`BtClassicTransport`) — RFCOMM `00001101-...` 소켓
+- 자동 폴백 — BLE 5초 타임아웃 시 BT Classic 전환 (`withTimeoutOrNull(5_000)`)
+- `ThinkGearParser` — BLE(`0xEA`/`0xEB`/`0xEC`) + BT Classic(`0xAA 0xAA` 헤더, 체크섬 검증) 동시 지원
+- `BrainWaveData.signalQuality` — `poorSignal` 값 기반 GOOD/FAIR/POOR/NO_SIGNAL 자동 판정
+- `SimulatorTransport` — FOCUSED/RELAXED/RANDOM/POOR_SIGNAL 모드, 1초 주기 emit
+- Kotlin 1.9, Coroutines 1.7.3, minSdk 23
 
 ## License
 
