@@ -43,7 +43,7 @@ This SDK eliminates TGC entirely by communicating directly with the MindWave Mob
 | Feature | Description |
 |---|---|
 | No TGC dependency | Communicates with hardware directly via Android Bluetooth APIs |
-| BLE + BT Classic | Supports both Bluetooth transports with automatic fallback |
+| BLE + BT Classic | BLE by default; BT Classic available for noisy RF environments |
 | Kotlin Coroutines & Flow | `Flow<BrainWaveData>` — integrates naturally with Jetpack lifecycle |
 | Built-in Simulator | Full data simulation without any hardware |
 | JitPack distribution | One-line Gradle dependency, no local setup |
@@ -114,9 +114,9 @@ The MindWave Mobile emulates a serial port (SPP UUID `00001101-...`). The SDK op
 
 Both paths produce identical `BrainWaveData` output through the same `dataFlow`.
 
-### Auto-fallback strategy
+### BLE default
 
-`NeuroSkySdk.connect()` always tries BLE first. If BLE does not reach `CONNECTED` within 5 seconds, it automatically disconnects BLE and retries with BT Classic. Your `dataFlow` collection code is unchanged — the transport switch is transparent.
+`NeuroSkySdk.connect()` uses BLE by default. To use BT Classic instead, pass `TransportMode.BT_CLASSIC` to `connect()`. Both transports produce the same `dataFlow` output.
 
 ---
 
@@ -278,7 +278,7 @@ class MainActivity : AppCompatActivity() {
 
         // Step 3: Connect and stream data
         lifecycleScope.launch {
-            // Connect using device name (BLE first, BT Classic fallback)
+            // Connect using device name (BLE by default)
             sdk.connect("MindWave Mobile")
 
             // Set notch filter for your region
@@ -820,7 +820,7 @@ class EegForegroundService : Service() {
 | Symptom | Likely cause | Solution |
 |---|---|---|
 | `SecurityException` on `connect()` | Bluetooth permission not granted at runtime | Request `BLUETOOTH_SCAN` + `BLUETOOTH_CONNECT` (API 31+) or `ACCESS_FINE_LOCATION` (API 23–30) |
-| `connect()` hangs for 5 seconds then falls back to BT Classic | BLE scan timeout | Normal Auto-fallback behavior. Use MAC address for faster BLE connect. |
+| `connect()` hangs indefinitely | BLE scan timeout | Use `findDeviceAddress()` first to resolve the MAC address, then pass the MAC to `connect()` for faster connection. |
 | BT Classic connect fails | Device not paired | Open Android Settings → Bluetooth → pair "MindWave Mobile" manually |
 | Connection drops after a few minutes | Android BLE background scan kill | Use a Foreground Service to prevent the OS from killing the connection |
 | `dataFlow` stops emitting after screen off | Background execution limit | Same — use a Foreground Service |
@@ -901,7 +901,7 @@ class NeuroSkySdk(context: Context)
 |---|---|---|
 | `connectionState` | `StateFlow<ConnectionState>` | Current connection state; hot Flow, always has a value |
 | `dataFlow` | `Flow<BrainWaveData>` | Cold Flow of EEG packets; collect to start receiving |
-| `connect(deviceAddress)` | `suspend fun` | BLE first; auto-falls back to BT Classic after 5 seconds |
+| `connect(deviceAddress)` | `suspend fun` | Connects via BLE by default; pass `TransportMode.BT_CLASSIC` for BT Classic |
 | `disconnect()` | `suspend fun` | Gracefully closes the active transport |
 | `sendCommand(cmd: Byte)` | `suspend fun` | Sends a control byte to the headset |
 

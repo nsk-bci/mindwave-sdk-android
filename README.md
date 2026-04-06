@@ -101,16 +101,12 @@ That's it — four steps from zero to streaming EEG data.
 
 | Mode | Behavior | Pairing required? |
 |---|---|---|
-| Auto (default) | BLE first; auto-falls back to BT Classic after 5 sec | No |
-| BLE only | Fastest, no pairing needed | No |
-| BT Classic only | More stable in noisy RF environments | Yes |
+| BLE (default) | Fastest, no pairing needed | No |
+| BT Classic | More stable in noisy RF environments | Yes |
 
 ```kotlin
-// Auto (default) — BLE first, BT Classic fallback
+// BLE (default)
 sdk.connect("MindWave Mobile")
-
-// BLE only
-sdk.connect("MindWave Mobile", TransportMode.BLE)
 
 // BT Classic only — pair the device first in Android Settings
 sdk.connect("MindWave Mobile", TransportMode.BT_CLASSIC)
@@ -163,37 +159,37 @@ lifecycleScope.launch {
 
 ### Packet timing
 
-BLE 모드에서는 두 characteristic이 서로 다른 속도로 패킷을 전송합니다.
+In BLE mode, two characteristics transmit packets at different rates.
 
-| Characteristic | 포함 필드 | 전송 주기 |
+| Characteristic | Fields | Rate |
 |---|---|---|
 | eSense `039afff8` | attention, meditation, EEG bands | ~1 Hz |
-| RawEEG `039afff4` | `rawEeg` (10샘플) | ~51 Hz (512 Hz ÷ 10) |
+| RawEEG `039afff4` | `rawEeg` (10 samples) | ~51 Hz (512 Hz ÷ 10) |
 
-`ThinkGearParser`는 상태를 누적합니다. 어느 characteristic이 트리거했든 emit된 `BrainWaveData`는 모든 필드의 **최신 누적값**을 담습니다.
+`ThinkGearParser` accumulates state. Regardless of which characteristic triggered the emit, each `BrainWaveData` object contains the latest accumulated value of every field.
 
-### 주의 — `attention` 기반 필터
+### Caution — attention-based filter
 
 ```kotlin
-// 잘못된 패턴 — rawEEG 전용 세션에서 모든 패킷이 버려짐
+// Wrong pattern — drops all packets in rawEEG-only sessions
 sdk.dataFlow
-    .filter { it.attention > 0 }  // eSense가 꺼져 있으면 attention은 항상 0
+    .filter { it.attention > 0 }  // attention is always 0 when eSense is off
     .collect { ... }
 ```
 
-`STOP_ESENSE`를 보내거나 `START_ESENSE`를 호출하지 않으면 디바이스는 attention 데이터를 보내지 않습니다. `attention`이 0으로 고정되어 위 필터는 모든 패킷을 무음으로 폐기합니다.
+If `STOP_ESENSE` is sent or `START_ESENSE` is never called, the device does not transmit attention data. `attention` stays at 0 and the filter silently drops every packet.
 
-**올바른 패턴:**
+**Correct patterns:**
 
 ```kotlin
-// eSense 세션 — 값이 아닌 신호 품질로 필터
+// eSense session — filter by signal quality, not value
 sdk.dataFlow
     .filter { it.signalQuality != SignalQuality.NO_SIGNAL }
     .collect { data ->
         println("Attention: ${data.attention}")
     }
 
-// rawEEG 전용 세션
+// rawEEG-only session
 sdk.sendCommand(NeuroSkyCommand.STOP_ESENSE)
 sdk.sendCommand(NeuroSkyCommand.START_RAW_EEG)
 sdk.dataFlow
@@ -202,8 +198,8 @@ sdk.dataFlow
         data.rawEeg.forEach { sample -> processRawSample(sample) }
     }
 
-// eSense + rawEEG 동시 사용 — 각 패킷에서 채워진 필드만 처리
-sdk.sendCommand(NeuroSkyCommand.START_RAW_EEG)  // eSense는 기본 활성
+// eSense + rawEEG simultaneously — process only the populated fields in each packet
+sdk.sendCommand(NeuroSkyCommand.START_RAW_EEG)  // eSense is active by default
 sdk.dataFlow.collect { data ->
     if (data.rawEeg.isNotEmpty()) processRawSamples(data.rawEeg)
     if (data.attention > 0)       updateEsenseUI(data)
@@ -272,49 +268,48 @@ sdk/src/main/kotlin/com/neurosky/sdk/
 
 ### JitPack dependency not resolving
 
-JitPack은 첫 요청 시 빌드를 시작합니다(1–3분 소요). Gradle 싱크가 즉시 실패하면 아래 순서로 확인하세요.
+JitPack starts building on first request (1–3 minutes). If Gradle sync fails immediately, follow these steps.
 
-**1. 빌드 로그 확인**
+**1. Check the build log**
 
 ```
 https://jitpack.io/com/github/nsk-bci/mindwave-sdk-android/v2.0.1/build.log
 ```
 
-**2. 빌드 진행 중** — 로그에 "build in progress"가 표시되면 2–3분 후 Gradle 싱크 재시도.
+**2. Build in progress** — if the log shows "build in progress", wait 2–3 minutes and retry Gradle sync.
 
-**3. 빌드 실패** — 주요 원인:
+**3. Build failure** — common causes:
 
-| 원인 | 해결 방법 |
+| Cause | Fix |
 |---|---|
-| Gradle 버전 불일치 | 로그의 에러 메시지 확인, 저장소 `gradle-wrapper.properties`와 비교 |
-| Rate limit / 캐시 만료 | 버전 태그 대신 전체 커밋 SHA 사용 |
-| 첫 빌드 실패 후 캐시됨 | 버전을 최신 태그 또는 커밋 SHA로 변경해 강제 재빌드 |
+| Gradle version mismatch | Check the error in the build log; compare with the repo's `gradle-wrapper.properties` |
+| Rate limit / cache expiry | Use a full commit SHA instead of a version tag |
+| First build failed and cached | Change the version to the latest tag or commit SHA to force a rebuild |
 
 ```kotlin
-// 커밋 SHA로 강제 지정 (태그 캐시 우회)
+// Force a specific commit SHA (bypasses tag cache)
 implementation("com.github.nsk-bci:mindwave-sdk-android:FULL_COMMIT_SHA")
 ```
 
-**4. Android Studio Offline 모드** — `File → Settings → Build → Gradle` 에서 *Offline work* 체크 해제.
+**4. Android Studio Offline mode** — uncheck *Offline work* in `File → Settings → Build → Gradle`.
 
 ---
 
 ## Changelog
 
 ### v2.0.1
-- `NeuroSkySdk.findDeviceAddress(name, timeoutMs)` 추가 — BLE 스캔으로 디바이스 이름 → MAC 주소 반환, 결과 캐시 권장
-- `sdk/consumer-rules.pro` 추가 — `BluetoothGattCallback` 5개 메서드 + 공개 API 클래스 R8 난독화 방지
-- JitPack 배포 설정 — `settings.gradle.kts` `dependencyResolutionManagement` + JitPack 저장소 등록
-- Sample 앱 UI 전면 개편 — MaterialCardView 기반 4-카드 레이아웃 (Signal Status / eSense / EEG Bands / Simulator Mode)
-- README: Developer Guide 링크 상단 이동, MAC 주소 획득 패턴, ProGuard 섹션 추가
+- `NeuroSkySdk.findDeviceAddress(name, timeoutMs)` — resolves device name to MAC address via BLE scan; cache result in SharedPreferences for faster subsequent connects
+- `sdk/consumer-rules.pro` — protects 5 `BluetoothGattCallback` methods and all public API classes from R8 obfuscation
+- JitPack distribution — `settings.gradle.kts` `dependencyResolutionManagement` + JitPack repository
+- Sample app UI redesign — MaterialCardView 4-card dashboard (Signal Status / eSense / EEG Bands / Simulator Mode)
+- README: Developer Guide link moved to top, MAC address discovery pattern, ProGuard section added
 
 ### v2.0.0
-- BLE GATT Transport (`BleTransport`) — `connectGatt()` → CCCD 구독 → Handshake(`0x17`) → 데이터 수신
-- BT Classic SPP Transport (`BtClassicTransport`) — RFCOMM `00001101-...` 소켓
-- 자동 폴백 — BLE 5초 타임아웃 시 BT Classic 전환 (`withTimeoutOrNull(5_000)`)
-- `ThinkGearParser` — BLE(`0xEA`/`0xEB`/`0xEC`) + BT Classic(`0xAA 0xAA` 헤더, 체크섬 검증) 동시 지원
-- `BrainWaveData.signalQuality` — `poorSignal` 값 기반 GOOD/FAIR/POOR/NO_SIGNAL 자동 판정
-- `SimulatorTransport` — FOCUSED/RELAXED/RANDOM/POOR_SIGNAL 모드, 1초 주기 emit
+- BLE GATT Transport (`BleTransport`) — `connectGatt()` → CCCD subscribe → Handshake(`0x17`) → data stream
+- BT Classic SPP Transport (`BtClassicTransport`) — RFCOMM `00001101-...` socket
+- `ThinkGearParser` — BLE(`0xEA`/`0xEB`/`0xEC`) + BT Classic(`0xAA 0xAA` header, checksum validation)
+- `BrainWaveData.signalQuality` — derived from `poorSignal`: GOOD/FAIR/POOR/NO_SIGNAL
+- `SimulatorTransport` — FOCUSED/RELAXED/RANDOM/POOR_SIGNAL modes, emits every 1 second
 - Kotlin 1.9, Coroutines 1.7.3, minSdk 23
 
 ## License
