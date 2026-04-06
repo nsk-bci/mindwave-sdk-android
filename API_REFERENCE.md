@@ -12,7 +12,7 @@ class NeuroSkySdk(context: Context)
 |---|---|---|
 | `connectionState` | `StateFlow<ConnectionState>` | 현재 연결 상태 |
 | `dataFlow` | `Flow<BrainWaveData>` | 실시간 뇌파 데이터 스트림 |
-| `connect(deviceAddress)` | `suspend fun` | BLE 우선 연결, 5초 실패 시 BT Classic 폴백 |
+| `connect(deviceAddress, transport)` | `suspend fun` | 지정한 트랜스포트로 연결. 기본값 `TransportType.BLE` |
 | `disconnect()` | `suspend fun` | 연결 해제 |
 | `sendCommand(cmd: Byte)` | `suspend fun` | 헤드셋에 명령 전송 |
 
@@ -74,6 +74,19 @@ interface Transport {
 ```
 
 구현체: `BleTransport`, `BtClassicTransport`, `SimulatorTransport`
+
+---
+
+## TransportType
+
+```kotlin
+enum class TransportType { BLE, BT_CLASSIC }
+```
+
+| 값 | 설명 |
+|---|---|
+| `BLE` | BLE 연결 (기본값) |
+| `BT_CLASSIC` | BT Classic SPP 연결 (명시적 선택) |
 
 ---
 

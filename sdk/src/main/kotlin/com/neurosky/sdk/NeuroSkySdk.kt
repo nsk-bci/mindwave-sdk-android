@@ -16,21 +16,28 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
+/** 연결에 사용할 트랜스포트 종류. */
+enum class TransportType { BLE, BT_CLASSIC }
+
 /**
  * NeuroSky MindWave SDK 진입점.
  *
- * BLE를 우선 시도하고, 5초 내 연결 실패 시 BT Classic으로 자동 폴백한다.
+ * 기본 트랜스포트는 BLE이며, BT Classic은 [TransportType.BT_CLASSIC]으로 명시해야 한다.
  *
  * ```kotlin
  * val sdk = NeuroSkySdk(context)
  *
  * lifecycleScope.launch {
+ *     // BLE 연결 (기본)
  *     sdk.connect("MindWave Mobile")
+ *
+ *     // BT Classic 연결 (명시적 선택)
+ *     // sdk.connect("MindWave Mobile", TransportType.BT_CLASSIC)
+ *
  *     sdk.dataFlow.collect { data ->
  *         println("Attention: ${data.attention}")
  *     }
@@ -53,19 +60,16 @@ class NeuroSkySdk(private val context: Context) {
 
     /**
      * 디바이스에 연결한다.
-     * @param deviceAddress BLE MAC 주소 또는 "MindWave Mobile" 디바이스 이름
+     *
+     * @param deviceAddress BLE MAC 주소 또는 디바이스 이름 (BLE), 페어링된 기기 이름/주소 (BT Classic)
+     * @param transport     사용할 트랜스포트. 기본값은 [TransportType.BLE]
      */
-    suspend fun connect(deviceAddress: String) {
-        activeTransport = bleTransport
-        bleTransport.connect(deviceAddress)
-
-        // BLE 연결 타임아웃 — 5초 내 CONNECTED 미달성 시 BT Classic 폴백
-        val bleConnected = waitForConnected(bleTransport, timeoutMs = 5_000L)
-        if (!bleConnected) {
-            bleTransport.disconnect()
-            activeTransport = btTransport
-            btTransport.connect(deviceAddress)
+    suspend fun connect(deviceAddress: String, transport: TransportType = TransportType.BLE) {
+        activeTransport = when (transport) {
+            TransportType.BLE        -> bleTransport
+            TransportType.BT_CLASSIC -> btTransport
         }
+        activeTransport.connect(deviceAddress)
 
         scope.launch {
             activeTransport.stateFlow.collect { state ->
@@ -116,9 +120,4 @@ class NeuroSkySdk(private val context: Context) {
         }
     }
 
-    private suspend fun waitForConnected(transport: Transport, timeoutMs: Long): Boolean {
-        return withTimeoutOrNull(timeoutMs) {
-            transport.stateFlow.first { it == ConnectionState.CONNECTED }
-        } != null
-    }
 }
