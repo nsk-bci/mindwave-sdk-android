@@ -106,23 +106,35 @@ That's it — four steps from zero to streaming EEG data.
 | BT Classic | More stable in noisy RF environments | Yes |
 
 ```kotlin
-// BLE (default)
-sdk.connect("MindWave Mobile")
+import com.neurosky.sdk.TransportType
 
-// BT Classic only — pair the device first in Android Settings
-sdk.connect("MindWave Mobile", TransportMode.BT_CLASSIC)
+// BLE (default)
+sdk.connect("AA:BB:CC:DD:EE:FF")
+
+// BT Classic — pair the device in Android Settings first
+sdk.connect("AA:BB:CC:DD:EE:FF", TransportType.BT_CLASSIC)
 ```
+
+> **No automatic fallback.** `NeuroSkySdk.connect()` uses exactly the transport you specify. There is no hidden BLE→BT Classic retry. If BLE fails (timeout, adapter unavailable), catch the exception and decide what to do yourself.
 
 ## Simulator (without a real device)
 
 ```kotlin
-import com.neurosky.sdk.simulator.SimulatorTransport
+import com.neurosky.sdk.simulator.SimulatorTransport  // package: simulator, not transport
 
 val simulator = SimulatorTransport()
 simulator.setMode(SimulatorTransport.Mode.FOCUSED)
 
 lifecycleScope.launch {
     simulator.connect("simulator")
+
+    // Connection state: SimulatorTransport exposes stateFlow (Transport interface).
+    // connectionState (StateFlow) is only available on NeuroSkySdk.
+    simulator.stateFlow.collect { state -> /* CONNECTED after ~500 ms */ }
+}
+
+// Separate coroutine to collect data
+lifecycleScope.launch {
     simulator.dataFlow.collect { data ->
         println("Attention: ${data.attention}")
     }
@@ -157,6 +169,23 @@ lifecycleScope.launch {
 | `signalQuality` | `SignalQuality` | enum | NO_SIGNAL/POOR/FAIR/GOOD |
 
 ## Working with dataFlow
+
+### Timing — collect AFTER connect()
+
+`sdk.dataFlow` is a property getter that returns the currently active transport's flow. Always start collecting **after** `connect()` returns — not before.
+
+```kotlin
+// Correct — collect inside the same coroutine after connect()
+lifecycleScope.launch {
+    sdk.connect("AA:BB:CC:DD:EE:FF")
+    sdk.dataFlow.collect { data -> /* ... */ }
+}
+
+// Wrong — sdk.dataFlow is evaluated before connect() sets the transport
+val flow = sdk.dataFlow       // captured before connect()
+sdk.connect("AA:BB:CC:DD:EE:FF")
+flow.collect { }              // may collect from an idle transport
+```
 
 ### Packet timing
 

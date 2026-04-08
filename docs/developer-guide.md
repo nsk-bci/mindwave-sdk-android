@@ -114,9 +114,11 @@ The MindWave Mobile emulates a serial port (SPP UUID `00001101-...`). The SDK op
 
 Both paths produce identical `BrainWaveData` output through the same `dataFlow`.
 
-### BLE default
+### BLE default — no automatic fallback
 
-`NeuroSkySdk.connect()` uses BLE by default. To use BT Classic instead, pass `TransportMode.BT_CLASSIC` to `connect()`. Both transports produce the same `dataFlow` output.
+`NeuroSkySdk.connect()` uses BLE by default. To use BT Classic instead, pass `TransportType.BT_CLASSIC` to `connect()`. Both transports produce the same `dataFlow` output.
+
+> `NeuroSkySdk` does **not** attempt BLE first and then fall back to BT Classic automatically. The transport you pass to `connect()` is the only transport used. If you need fallback logic, implement it yourself in the caller.
 
 ---
 
@@ -552,18 +554,31 @@ sdk.sendCommand(NeuroSkyCommand.START_ESENSE)
 ### Basic usage
 
 ```kotlin
-import com.neurosky.sdk.simulator.SimulatorTransport
+import com.neurosky.sdk.simulator.SimulatorTransport  // package: simulator, NOT transport
 
 val simulator = SimulatorTransport()
 simulator.setMode(SimulatorTransport.Mode.FOCUSED)
 
 lifecycleScope.launch {
-    simulator.connect("simulator")  // any string accepted
+    simulator.connect("simulator")  // any string accepted; CONNECTED after ~500 ms
 
     simulator.dataFlow.collect { data ->
         Log.d("SIM", "Attention: ${data.attention}, Meditation: ${data.meditation}")
     }
 }
+```
+
+> **`stateFlow` vs `connectionState`:**
+> `SimulatorTransport` (and all `Transport` implementations) expose `stateFlow: Flow<ConnectionState>` from the `Transport` interface.
+> `connectionState: StateFlow<ConnectionState>` is a property of `NeuroSkySdk` only — it does **not** exist on `SimulatorTransport` or the `Transport` interface directly.
+>
+> ```kotlin
+> // Wrong — connectionState does not exist on SimulatorTransport
+> simulator.connectionState.collect { }   // compile error
+>
+> // Correct — use stateFlow (Transport interface)
+> simulator.stateFlow.collect { state -> /* CONNECTED, DISCONNECTED, … */ }
+> ```
 ```
 
 ### Simulator modes
@@ -841,7 +856,19 @@ class EegForegroundService : Service() {
 |---|---|---|
 | `Could not resolve com.github.nsk-bci:mindwave-sdk-android` | JitPack not in repository list | Add `maven { url = uri("https://jitpack.io") }` to `settings.gradle.kts` |
 | `Unresolved reference: NeuroSkySdk` | Missing `import` | Add `import com.neurosky.sdk.NeuroSkySdk` |
+| `Unresolved reference: SimulatorTransport` | Wrong import | Use `import com.neurosky.sdk.simulator.SimulatorTransport` (package is `simulator`, not `transport`) |
+| `Unresolved reference: TransportMode` | Old doc typo | The correct enum is `TransportType`. Use `TransportType.BLE` / `TransportType.BT_CLASSIC` |
+| `Unresolved reference: connectionState` on simulator | Wrong API | `connectionState` belongs to `NeuroSkySdk`. Use `simulator.stateFlow` instead |
+| `Unresolved reference: alphaLow` / `betaHigh` | Wrong field name order | Field names are `lowAlpha`, `highAlpha`, `lowBeta`, `highBeta`, `lowGamma`, `midGamma` — modifier first |
 | First build very slow | JitPack building from source | Normal — only happens once; subsequent builds use cache |
+
+### Data issues
+
+| Symptom | Likely cause | Solution |
+|---|---|---|
+| `dataFlow` emits nothing even though connected | `dataFlow` captured before `connect()` | Move `sdk.dataFlow.collect` to inside the same coroutine after `connect()` returns |
+| BLE connected but data always 0, NO_SIGNAL forever | Notch filter not set, or eSense not started | Call `sendCommand(NeuroSkyCommand.NOTCH_60HZ)` after connecting |
+| Connection takes 5+ seconds | BLE scan by device name | Use `findDeviceAddress()` first, cache the MAC, then pass MAC to `connect()` |
 
 ---
 
@@ -900,10 +927,15 @@ class NeuroSkySdk(context: Context)
 | Member | Type | Description |
 |---|---|---|
 | `connectionState` | `StateFlow<ConnectionState>` | Current connection state; hot Flow, always has a value |
-| `dataFlow` | `Flow<BrainWaveData>` | Cold Flow of EEG packets; collect to start receiving |
-| `connect(deviceAddress)` | `suspend fun` | Connects via BLE by default; pass `TransportMode.BT_CLASSIC` for BT Classic |
+| `dataFlow` | `Flow<BrainWaveData>` | Returns `activeTransport.dataFlow` at call time — collect **after** `connect()` |
+| `connect(deviceAddress, transport)` | `suspend fun` | Connects via the given `TransportType`. Default: `TransportType.BLE`. No automatic fallback |
 | `disconnect()` | `suspend fun` | Gracefully closes the active transport |
 | `sendCommand(cmd: Byte)` | `suspend fun` | Sends a control byte to the headset |
+| `findDeviceAddress(deviceName, timeoutMs)` | `suspend fun` | BLE scan returning MAC address, or null on timeout |
+
+> **`dataFlow` timing:** `sdk.dataFlow` is a property getter — each access returns the current `activeTransport.dataFlow`. Capturing `sdk.dataFlow` into a variable *before* `connect()` will bind the flow to the pre-connect transport state. Always collect inside the same coroutine that calls `connect()`, or after `connectionState` emits `CONNECTED`.
+>
+> **`TransportType` not `TransportMode`:** The enum is `TransportType` with values `BLE` and `BT_CLASSIC`. `TransportMode` does not exist in the API.
 
 ---
 
@@ -1009,5 +1041,5 @@ object NeuroSkyCommand
 
 ---
 
-*NeuroSky MindWave Mobile Android SDK v2.0.1 · Apache License 2.0*
+*NeuroSky MindWave Mobile Android SDK v2.0.2 · Apache License 2.0*
 *github.com/nsk-bci/mindwave-sdk-android*
