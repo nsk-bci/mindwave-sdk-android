@@ -104,6 +104,25 @@
 
 ---
 
+## [2.0.3] — 2026-04-09
+
+### Fixed
+
+#### `BleTransport` / `BtClassicTransport` — dataFlow lifecycle decoupled from connection
+- `callbackFlow`를 `MutableSharedFlow(extraBufferCapacity = 64)`로 교체
+- GATT 연결·소켓 수명이 이제 `connect()`/`disconnect()`로만 제어됨 — `dataFlow` 수집 중단이 BLE 연결을 닫지 않음
+- `BtClassicTransport`: 전용 `readLoop` coroutine + `SupervisorJob` 스코프로 재작성, 소켓 에러 시 `stateFlow`로 상태 전파
+
+#### `ThinkGearParser` — BT Classic `0x83` bounds guard
+- `parseByte()` 내 `0x83` (EEG Power 24바이트) 분기에서 `len` 바이트 읽기 전 `if (i >= payload.size) break` 추가
+- 이전에는 잘려진 페이로드에서 `IndexOutOfBoundsException` 발생 가능
+
+#### `NeuroSkySdk` — KDoc 명확화
+- `connect()` `@param deviceAddress`에 Bluetooth MAC 주소 형식(예: `"AA:BB:CC:DD:EE:FF"`) 명시
+- `findDeviceAddress()`로 이름→주소 변환 가능함을 KDoc 코드 블록에 추가
+
+---
+
 ## [2.0.2] — 2026-04-08
 
 ### Fixed (문서 정정 · 이슈 #34 대응)

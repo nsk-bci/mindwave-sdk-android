@@ -77,7 +77,7 @@ class ThinkGearParser {
         val samples = (0 until 10).map { i ->
             val offset = i * 2
             var raw = ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
-            if (raw > 32768) raw -= 65536
+            if (raw >= 32768) raw -= 65536
             raw
         }
         current = current.copy(rawEeg = samples, timestamp = System.currentTimeMillis())
@@ -135,27 +135,31 @@ class ThinkGearParser {
             val code = payload[i++].toInt() and 0xFF
             when (code) {
                 0x02 -> { // PoorSignal
-                    current = current.copy(poorSignal = payload[i++].toInt() and 0xFF)
+                    if (i < payload.size) current = current.copy(poorSignal = payload[i++].toInt() and 0xFF)
                 }
                 0x04 -> { // Attention
-                    current = current.copy(attention = payload[i++].toInt() and 0xFF)
+                    if (i < payload.size) current = current.copy(attention = payload[i++].toInt() and 0xFF)
                 }
                 0x05 -> { // Meditation
-                    current = current.copy(meditation = payload[i++].toInt() and 0xFF)
+                    if (i < payload.size) current = current.copy(meditation = payload[i++].toInt() and 0xFF)
                 }
                 0x16 -> { // Blink strength
-                    current = current.copy(eyeBlink = payload[i++].toInt() and 0xFF)
+                    if (i < payload.size) current = current.copy(eyeBlink = payload[i++].toInt() and 0xFF)
                 }
                 0x80 -> { // Raw EEG (2바이트)
+                    if (i >= payload.size) break
                     val len = payload[i++].toInt() and 0xFF
-                    if (i + len <= payload.size) {
+                    if (i + len <= payload.size && len >= 2) {
                         var raw = ((payload[i].toInt() and 0xFF) shl 8) or (payload[i + 1].toInt() and 0xFF)
-                        if (raw > 32768) raw -= 65536
+                        if (raw >= 32768) raw -= 65536
                         current = current.copy(rawEeg = listOf(raw))
+                        i += len
+                    } else {
                         i += len
                     }
                 }
                 0x83 -> { // EEG Power (24바이트)
+                    if (i >= payload.size) break
                     val len = payload[i++].toInt() and 0xFF
                     if (i + len <= payload.size && len >= 24) {
                         current = current.copy(
@@ -171,7 +175,17 @@ class ThinkGearParser {
                         i += len
                     }
                 }
-                else -> i++ // 알 수 없는 코드, 1바이트 skip
+                else -> {
+                    // 알 수 없는 코드: 0x80 이상이면 length+data skip, 미만이면 value 1바이트 skip
+                    if (code >= 0x80) {
+                        if (i < payload.size) {
+                            val len = payload[i++].toInt() and 0xFF
+                            i += len
+                        }
+                    } else {
+                        if (i < payload.size) i++
+                    }
+                }
             }
         }
         return current.copy(timestamp = System.currentTimeMillis())

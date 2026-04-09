@@ -32,11 +32,11 @@ enum class TransportType { BLE, BT_CLASSIC }
  * val sdk = NeuroSkySdk(context)
  *
  * lifecycleScope.launch {
- *     // BLE 연결 (기본)
- *     sdk.connect("MindWave Mobile")
+ *     // BLE 연결 (기본) — MAC 주소 필요. findDeviceAddress()로 조회 가능
+ *     sdk.connect("AA:BB:CC:DD:EE:FF")
  *
  *     // BT Classic 연결 (명시적 선택)
- *     // sdk.connect("MindWave Mobile", TransportType.BT_CLASSIC)
+ *     // sdk.connect("AA:BB:CC:DD:EE:FF", TransportType.BT_CLASSIC)
  *
  *     sdk.dataFlow.collect { data ->
  *         println("Attention: ${data.attention}")
@@ -61,7 +61,7 @@ class NeuroSkySdk(private val context: Context) {
     /**
      * 디바이스에 연결한다.
      *
-     * @param deviceAddress BLE MAC 주소 또는 디바이스 이름 (BLE), 페어링된 기기 이름/주소 (BT Classic)
+     * @param deviceAddress Bluetooth MAC 주소 (예: "AA:BB:CC:DD:EE:FF"). [findDeviceAddress]로 이름→주소 변환 가능
      * @param transport     사용할 트랜스포트. 기본값은 [TransportType.BLE]
      */
     suspend fun connect(deviceAddress: String, transport: TransportType = TransportType.BLE) {

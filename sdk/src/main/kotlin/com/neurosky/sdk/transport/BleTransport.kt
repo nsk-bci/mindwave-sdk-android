@@ -12,11 +12,9 @@ import com.neurosky.sdk.NeuroSkyCommand
 import com.neurosky.sdk.NeuroSkyUUID
 import com.neurosky.sdk.model.BrainWaveData
 import com.neurosky.sdk.parser.ThinkGearParser
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.callbackFlow
 
 class BleTransport(private val context: Context) : Transport {
 
@@ -27,8 +25,7 @@ class BleTransport(private val context: Context) : Transport {
     private var gatt: BluetoothGatt? = null
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
 
-    // callbackFlow 채널 참조 — gattCallback에서 데이터 전송에 사용
-    private var dataChannel: SendChannel<BrainWaveData>? = null
+    private val _dataFlow = MutableSharedFlow<BrainWaveData>(extraBufferCapacity = 64)
 
     // Descriptor write는 직렬로 처리해야 함 (BLE 스택 제약)
     private val pendingDescriptors = ArrayDeque<BluetoothGattDescriptor>()
@@ -37,19 +34,25 @@ class BleTransport(private val context: Context) : Transport {
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
+            if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
                 _stateFlow.value = ConnectionState.CONNECTING
                 gatt.discoverServices()
             } else {
-                _stateFlow.value = ConnectionState.DISCONNECTED
-                dataChannel?.close()
+                _stateFlow.value = if (status != BluetoothGatt.GATT_SUCCESS) ConnectionState.ERROR else ConnectionState.DISCONNECTED
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                _stateFlow.value = ConnectionState.ERROR
+                return
+            }
             val service = gatt.services.firstOrNull { svc ->
                 svc.characteristics.any { it.uuid == NeuroSkyUUID.ESENSE }
-            } ?: return
+            } ?: run {
+                _stateFlow.value = ConnectionState.ERROR
+                return
+            }
 
             pendingDescriptors.clear()
             handshakeSent = false
@@ -70,6 +73,10 @@ class BleTransport(private val context: Context) : Transport {
             descriptor: BluetoothGattDescriptor,
             status: Int
         ) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                _stateFlow.value = ConnectionState.ERROR
+                return
+            }
             if (pendingDescriptors.isNotEmpty()) {
                 // 남은 descriptor가 있으면 계속 처리
                 writeNextDescriptor(gatt)
@@ -77,7 +84,21 @@ class BleTransport(private val context: Context) : Transport {
                 // 모든 descriptor write 완료 후 핸드셰이크를 1회만 전송
                 handshakeSent = true
                 sendHandshake(gatt, NeuroSkyCommand.START_ESENSE)
-                _stateFlow.value = ConnectionState.CONNECTED
+                // CONNECTED는 onCharacteristicWrite에서 핸드셰이크 성공 확인 후 전환
+            }
+        }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) {
+            if (characteristic.uuid == NeuroSkyUUID.HANDSHAKE) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    _stateFlow.value = ConnectionState.CONNECTED
+                } else {
+                    _stateFlow.value = ConnectionState.ERROR
+                }
             }
         }
 
@@ -88,7 +109,7 @@ class BleTransport(private val context: Context) : Transport {
             characteristic: BluetoothGattCharacteristic
         ) {
             val data = parser.parse(characteristic.uuid, characteristic.value)
-            if (data != null) dataChannel?.trySend(data)
+            if (data != null) _dataFlow.tryEmit(data)
         }
 
         // API 33+
@@ -98,18 +119,11 @@ class BleTransport(private val context: Context) : Transport {
             value: ByteArray
         ) {
             val data = parser.parse(characteristic.uuid, value)
-            if (data != null) dataChannel?.trySend(data)
+            if (data != null) _dataFlow.tryEmit(data)
         }
     }
 
-    override val dataFlow: Flow<BrainWaveData> = callbackFlow {
-        dataChannel = channel
-        awaitClose {
-            dataChannel = null
-            gatt?.close()
-            gatt = null
-        }
-    }
+    override val dataFlow: Flow<BrainWaveData> = _dataFlow
 
     override suspend fun connect(deviceAddress: String) {
         _stateFlow.value = ConnectionState.SCANNING

@@ -33,7 +33,7 @@ dependencyResolutionManagement {
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.nsk-bci:mindwave-sdk-android:v2.0.1")
+    implementation("com.github.nsk-bci:mindwave-sdk-android:v2.0.3")
 }
 ```
 
@@ -280,7 +280,7 @@ If you maintain your own rules and override the SDK's, add at minimum:
 
 ```
 sdk/src/main/kotlin/com/neurosky/sdk/
-├── NeuroSkySdk.kt              Entry point (BLE first + BT Classic fallback)
+├── NeuroSkySdk.kt              Entry point (BLE or BT Classic, explicit transport selection)
 ├── NeuroSkyUUID.kt             BLE UUID constants, command byte constants
 ├── model/
 │   └── BrainWaveData.kt        EEG data model
@@ -303,7 +303,7 @@ JitPack starts building on first request (1–3 minutes). If Gradle sync fails i
 **1. Check the build log**
 
 ```
-https://jitpack.io/com/github/nsk-bci/mindwave-sdk-android/v2.0.1/build.log
+https://jitpack.io/com/github/nsk-bci/mindwave-sdk-android/v2.0.3/build.log
 ```
 
 **2. Build in progress** — if the log shows "build in progress", wait 2–3 minutes and retry Gradle sync.
@@ -327,7 +327,15 @@ implementation("com.github.nsk-bci:mindwave-sdk-android:FULL_COMMIT_SHA")
 
 ## Changelog
 
-### v2.0.1
+### v2.0.3
+- `BleTransport` / `BtClassicTransport` — `callbackFlow` → `MutableSharedFlow`: GATT/socket lifetime now fully controlled by `connect()`/`disconnect()`, stopping collection no longer drops the connection
+- `ThinkGearParser` — BT Classic `0x83` bounds guard: prevents `IndexOutOfBoundsException` on truncated payloads
+- `NeuroSkySdk` KDoc — `deviceAddress` parameter now explicitly states MAC address format
+
+### v2.0.2
+- `TransportMode` typo fixed → `TransportType`; `SimulatorTransport` API clarified (`stateFlow`, not `connectionState`); `BrainWaveData` field naming clarified (`lowAlpha` not `alphaLow`); `dataFlow` collect-after-connect timing documented; BLE→BT Classic auto-fallback misconception resolved
+
+### v2.0.3
 - `NeuroSkySdk.findDeviceAddress(name, timeoutMs)` — resolves device name to MAC address via BLE scan; cache result in SharedPreferences for faster subsequent connects
 - `sdk/consumer-rules.pro` — protects 5 `BluetoothGattCallback` methods and all public API classes from R8 obfuscation
 - JitPack distribution — `settings.gradle.kts` `dependencyResolutionManagement` + JitPack repository
