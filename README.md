@@ -74,7 +74,7 @@ lifecycleScope.launch {
         return@launch
     }
 
-    sdk.connect(address)
+    sdk.connect(address)  // BLE — pass TransportType.BT_CLASSIC as second arg for BT Classic
     sdk.sendCommand(NeuroSkyCommand.NOTCH_60HZ)  // Korea/USA; use NOTCH_50HZ for Europe/China
 
     sdk.dataFlow.collect { data ->
@@ -100,22 +100,25 @@ That's it — four steps from zero to streaming EEG data.
 
 ## Connection Modes
 
-| Mode | Behavior | Pairing required? |
-|---|---|---|
-| BLE (default) | Fastest, no pairing needed | No |
-| BT Classic | More stable in noisy RF environments | Yes |
+`connect()` uses **exactly the transport you pass** — there is no automatic fallback. Pick one explicitly:
 
 ```kotlin
 import com.neurosky.sdk.TransportType
 
-// BLE (default)
+// BLE — no device pairing required; omitting TransportType defaults to BLE
 sdk.connect("AA:BB:CC:DD:EE:FF")
+sdk.connect("AA:BB:CC:DD:EE:FF", TransportType.BLE)  // same as above, explicit
 
 // BT Classic — pair the device in Android Settings first
 sdk.connect("AA:BB:CC:DD:EE:FF", TransportType.BT_CLASSIC)
 ```
 
-> **No automatic fallback.** `NeuroSkySdk.connect()` uses exactly the transport you specify. There is no hidden BLE→BT Classic retry. If BLE fails (timeout, adapter unavailable), catch the exception and decide what to do yourself.
+| Transport | When to choose | Pairing required? |
+|---|---|---|
+| `BLE` (default) | Standard use — no pairing, lower power | No |
+| `BT_CLASSIC` | Noisy RF environments where BLE is unstable | Yes |
+
+> **No automatic fallback.** If the chosen transport fails (timeout, adapter unavailable, pairing missing), an exception is thrown. The SDK does not silently retry with the other transport. Handle the exception and prompt the user to choose.
 
 ## Simulator (without a real device)
 

@@ -19,6 +19,24 @@ class SimulatorTransport : Transport {
 
     private var mode = Mode.RANDOM
     private val _stateFlow = MutableStateFlow(ConnectionState.DISCONNECTED)
+
+    /**
+     * 현재 연결 상태를 나타내는 [Flow].
+     *
+     * [Transport] 인터페이스에 정의된 `stateFlow`이며, `connectionState`가 아님에 주의.
+     * `connectionState`는 [com.neurosky.sdk.NeuroSkySdk]가 내부 트랜스포트의 이
+     * `stateFlow`를 구독해 외부로 노출하는 [kotlinx.coroutines.flow.StateFlow] 래퍼다.
+     *
+     * [SimulatorTransport]를 직접 사용할 때는 반드시 이 프로퍼티를 구독할 것.
+     *
+     * ```kotlin
+     * // 올바른 사용
+     * simulatorTransport.stateFlow.collect { state -> ... }
+     *
+     * // 잘못된 사용 — SimulatorTransport에는 connectionState가 없다
+     * // simulatorTransport.connectionState  // 컴파일 에러
+     * ```
+     */
     override val stateFlow: Flow<ConnectionState> = _stateFlow
 
     fun setMode(newMode: Mode) { mode = newMode }
