@@ -59,7 +59,7 @@
 
 ---
 
-## [2.0.1] — 2026-04-06
+## [2.0.1] — 2026-04-09
 
 ### Added
 
@@ -102,10 +102,6 @@
 - Troubleshooting 섹션 신규 추가 — JitPack 빌드 실패 4가지 원인·해결책
 - Working with dataFlow 섹션 신규 추가 — 패킷 타이밍 표, `filter { attention > 0 }` 안티패턴 및 올바른 3가지 패턴
 
----
-
-## [2.0.3] — 2026-04-09
-
 ### Fixed
 
 #### `BleTransport` / `BtClassicTransport` — dataFlow lifecycle decoupled from connection
@@ -117,42 +113,9 @@
 - `parseByte()` 내 `0x83` (EEG Power 24바이트) 분기에서 `len` 바이트 읽기 전 `if (i >= payload.size) break` 추가
 - 이전에는 잘려진 페이로드에서 `IndexOutOfBoundsException` 발생 가능
 
-#### `NeuroSkySdk` — KDoc 명확화
-- `connect()` `@param deviceAddress`에 Bluetooth MAC 주소 형식(예: `"AA:BB:CC:DD:EE:FF"`) 명시
-- `findDeviceAddress()`로 이름→주소 변환 가능함을 KDoc 코드 블록에 추가
-
----
-
-## [2.0.2] — 2026-04-08
-
-### Fixed (문서 정정 · 이슈 #34 대응)
-
-#### 이슈 1 — `TransportMode` 오타 수정
-- README / developer-guide 의 `TransportMode.BT_CLASSIC` → `TransportType.BT_CLASSIC` 수정
-- 실제 소스(`NeuroSkySdk.kt`)의 열거형은 처음부터 `TransportType`이었으나 문서가 잘못 기재됨
-
-#### 이슈 2 — `SimulatorTransport` API 명확화
-- `connectionState: StateFlow<ConnectionState>` 는 `NeuroSkySdk` 전용 래퍼 프로퍼티
-- `SimulatorTransport` (및 모든 `Transport` 구현체)는 `stateFlow: Flow<ConnectionState>` 노출
-- README Simulator 예시 코드에 올바른 API 명시 및 패키지 경로(`com.neurosky.sdk.simulator`) 강조
-
-#### 이슈 3 — `BrainWaveData` 필드명 명확화
-- EEG 밴드 필드명이 `alphaLow/alphaHigh` 가 아닌 `lowAlpha/highAlpha` 형식임을 API_REFERENCE 에 명시
-- developer-guide 에 "주의: 잘못 쓰기 쉬운 필드명" 표 추가
-
-#### 이슈 4 — `dataFlow` 수집 타이밍 가이드 추가
-- `sdk.dataFlow`는 호출 시점의 `activeTransport`를 반환하는 getter
-- `connect()` 완료 이전에 캡처하면 idle Transport의 flow를 구독할 수 있음
-- README "Working with dataFlow" 섹션에 타이밍 규칙 및 잘못된 패턴/올바른 패턴 코드 추가
-- developer-guide 에 동일 내용 추가
-
-#### 이슈 5 — BLE→BT Classic 자동 폴백 오해 해소
-- CHANGELOG v2.0.0 의 "BLE 5초 시도 후 BT Classic 자동 폴백" 설명이 실제 구현과 달랐음 → 수정
-- `NeuroSkySdk.connect()`는 전달한 `TransportType` 하나만 사용; 내부 폴백 없음
-- README Connection Modes 섹션에 "No automatic fallback" 명시
-
----
-
-## [1.x] — Legacy (NeuroSky 공식 SDK)
-- TGC 기반 TCP 통신 (`ThinkGearConnector.connect("127.0.0.1", 13854)`)
-- Java API, 콜백 방식
+#### 문서 정정
+- README / developer-guide의 `TransportMode.BT_CLASSIC` → `TransportType.BT_CLASSIC` 수정
+- `SimulatorTransport`의 `stateFlow: Flow<ConnectionState>` API 명확화 — `connectionState`는 `NeuroSkySdk` 전용 래퍼
+- EEG 밴드 필드명 `lowAlpha/highAlpha` 형식 명시 (`alphaLow/alphaHigh` 아님)
+- `dataFlow` 수집 타이밍 가이드 추가 — `connect()` 완료 이전 캡처 시 idle Transport flow 구독 위험 안내
+- BLE→BT Classic 자동 폴백 없음 명시 — `connect()`는 전달한 `TransportType` 하나만 사용
