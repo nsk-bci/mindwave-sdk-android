@@ -330,20 +330,10 @@ implementation("com.github.nsk-bci:mindwave-sdk-android:FULL_COMMIT_SHA")
 
 ## Changelog
 
-### v2.0.3
+### v2.0.1
 - `BleTransport` / `BtClassicTransport` — `callbackFlow` → `MutableSharedFlow`: GATT/socket lifetime now fully controlled by `connect()`/`disconnect()`, stopping collection no longer drops the connection
 - `ThinkGearParser` — BT Classic `0x83` bounds guard: prevents `IndexOutOfBoundsException` on truncated payloads
 - `NeuroSkySdk` KDoc — `deviceAddress` parameter now explicitly states MAC address format
-
-### v2.0.2
-- `TransportMode` typo fixed → `TransportType`; `SimulatorTransport` API clarified (`stateFlow`, not `connectionState`); `BrainWaveData` field naming clarified (`lowAlpha` not `alphaLow`); `dataFlow` collect-after-connect timing documented; BLE→BT Classic auto-fallback misconception resolved
-
-### v2.0.3
-- `NeuroSkySdk.findDeviceAddress(name, timeoutMs)` — resolves device name to MAC address via BLE scan; cache result in SharedPreferences for faster subsequent connects
-- `sdk/consumer-rules.pro` — protects 5 `BluetoothGattCallback` methods and all public API classes from R8 obfuscation
-- JitPack distribution — `settings.gradle.kts` `dependencyResolutionManagement` + JitPack repository
-- Sample app UI redesign — MaterialCardView 4-card dashboard (Signal Status / eSense / EEG Bands / Simulator Mode)
-- README: Developer Guide link moved to top, MAC address discovery pattern, ProGuard section added
 
 ### v2.0.0
 - BLE GATT Transport (`BleTransport`) — `connectGatt()` → CCCD subscribe → Handshake(`0x17`) → data stream
