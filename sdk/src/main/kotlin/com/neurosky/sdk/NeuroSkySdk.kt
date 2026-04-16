@@ -1,6 +1,6 @@
 package com.neurosky.sdk
 
-import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
@@ -50,6 +50,11 @@ class NeuroSkySdk(private val context: Context) {
 
     private val bleTransport = BleTransport(context)
     private val btTransport  = BtClassicTransport()
+
+    /** BLE 내부 로그를 UI로 전달하는 콜백 설정 */
+    fun setLogger(log: (String) -> Unit) {
+        bleTransport.logger = log
+    }
 
     private var activeTransport: Transport = bleTransport
 
@@ -118,7 +123,8 @@ class NeuroSkySdk(private val context: Context) {
         deviceName: String = "MindWave Mobile",
         timeoutMs: Long = 10_000L
     ): String? {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
+        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val adapter = bluetoothManager?.adapter ?: return null
         val scanner = adapter.bluetoothLeScanner ?: return null
 
         return withTimeoutOrNull(timeoutMs) {

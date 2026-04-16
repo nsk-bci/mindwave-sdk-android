@@ -31,8 +31,8 @@ class ThinkGearParser {
      * 0xEC 패킷 — LowBeta, HighBeta, LowGamma, MidGamma
      */
     private fun parseEsense(bytes: ByteArray): BrainWaveData? {
-        if (bytes.isEmpty()) return null
-        return when (bytes[0].toInt() and 0xFF) {
+        if (bytes.size < 3) return null
+        return when (bytes[2].toInt() and 0xFF) {
             0xEA -> {
                 if (bytes.size < 11) return null
                 current = current.copy(
