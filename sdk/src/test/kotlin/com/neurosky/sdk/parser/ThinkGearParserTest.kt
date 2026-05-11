@@ -17,7 +17,7 @@ class ThinkGearParserTest {
     @Test
     fun parseEsense_0xEA_returnsAttentionMeditationPoorSignal() {
         val bytes = ByteArray(11)
-        bytes[0]  = 0xEA.toByte()
+        bytes[2]  = 0xEA.toByte()   // pack ID at offset 2 (BLE eSense 2-byte preamble)
         bytes[6]  = 10    // PoorSignal
         bytes[8]  = 75    // Attention
         bytes[10] = 55    // Meditation
@@ -33,7 +33,7 @@ class ThinkGearParserTest {
     @Test
     fun parseEsense_0xEA_tooShort_returnsNull() {
         val bytes = ByteArray(5)
-        bytes[0] = 0xEA.toByte()
+        bytes[2] = 0xEA.toByte()
 
         val result = parser.parse(NeuroSkyUUID.ESENSE, bytes)
 
@@ -45,7 +45,7 @@ class ThinkGearParserTest {
     @Test
     fun parseEsense_0xEB_returnsDeltaThetaAlpha() {
         val bytes = ByteArray(20)
-        bytes[0] = 0xEB.toByte()
+        bytes[2] = 0xEB.toByte()   // pack ID at offset 2
         // Delta at bytes[5~7] = 256
         bytes[5] = 0x00; bytes[6] = 0x01; bytes[7] = 0x00
         // Theta at bytes[9~11] = 512
@@ -60,7 +60,7 @@ class ThinkGearParserTest {
         assertNull(eb)
 
         // Trigger 0xEC to flush
-        val ec = ByteArray(20).also { it[0] = 0xEC.toByte() }
+        val ec = ByteArray(20).also { it[2] = 0xEC.toByte() }
         val result = parser.parse(NeuroSkyUUID.ESENSE, ec)
 
         assertNotNull(result)
@@ -75,7 +75,7 @@ class ThinkGearParserTest {
     @Test
     fun parseEsense_0xEC_returnsBetaGamma() {
         val bytes = ByteArray(20)
-        bytes[0]  = 0xEC.toByte()
+        bytes[2]  = 0xEC.toByte()   // pack ID at offset 2
         bytes[5]  = 0x00; bytes[6]  = 0x05; bytes[7]  = 0x00  // LowBeta  = 1280
         bytes[9]  = 0x00; bytes[10] = 0x06; bytes[11] = 0x00  // HighBeta = 1536
         bytes[13] = 0x00; bytes[14] = 0x07; bytes[15] = 0x00  // LowGamma = 1792
@@ -198,25 +198,25 @@ class ThinkGearParserTest {
 
     @Test
     fun signalQuality_200_isNoSignal() {
-        val bytes = ByteArray(11).also { it[0] = 0xEA.toByte(); it[6] = 200.toByte() }
+        val bytes = ByteArray(11).also { it[2] = 0xEA.toByte(); it[6] = 200.toByte() }
         assertEquals(SignalQuality.NO_SIGNAL, parser.parse(NeuroSkyUUID.ESENSE, bytes)!!.signalQuality)
     }
 
     @Test
     fun signalQuality_100_isPoor() {
-        val bytes = ByteArray(11).also { it[0] = 0xEA.toByte(); it[6] = 100 }
+        val bytes = ByteArray(11).also { it[2] = 0xEA.toByte(); it[6] = 100 }
         assertEquals(SignalQuality.POOR, parser.parse(NeuroSkyUUID.ESENSE, bytes)!!.signalQuality)
     }
 
     @Test
     fun signalQuality_25_isFair() {
-        val bytes = ByteArray(11).also { it[0] = 0xEA.toByte(); it[6] = 25 }
+        val bytes = ByteArray(11).also { it[2] = 0xEA.toByte(); it[6] = 25 }
         assertEquals(SignalQuality.FAIR, parser.parse(NeuroSkyUUID.ESENSE, bytes)!!.signalQuality)
     }
 
     @Test
     fun signalQuality_0_isGood() {
-        val bytes = ByteArray(11).also { it[0] = 0xEA.toByte(); it[6] = 0 }
+        val bytes = ByteArray(11).also { it[2] = 0xEA.toByte(); it[6] = 0 }
         assertEquals(SignalQuality.GOOD, parser.parse(NeuroSkyUUID.ESENSE, bytes)!!.signalQuality)
     }
 }
