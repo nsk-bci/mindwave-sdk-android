@@ -1,0 +1,31 @@
+# .github/dependabot.yml
+# Kotlin/Gradle 의존성 자동 업데이트
+# Single-Account 모드: reviewers 항목 사용 안 함
+# Branch Protection의 Required status checks로 통제
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Seoul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Seoul"
+    labels:
+      - "github-actions"
+      - "automated"

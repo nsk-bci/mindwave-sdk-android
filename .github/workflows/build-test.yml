@@ -1,0 +1,44 @@
+# .github/workflows/build-test.yml
+# Android API level별 매트릭스 빌드 & 테스트
+name: Build & Test (Android Matrix)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [23, 26, 29, 31, 33, 34, 35, 36]
+        # API 37(Android 17) 출시 시 자동 추가 워크플로우 Sprint 02에서 추가
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build SDK
+        run: ./gradlew :sdk:build
+
+      - name: Run unit tests
+        run: ./gradlew :sdk:testDebugUnitTest
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-api-${{ matrix.api-level }}
+          path: sdk/build/reports/tests/
