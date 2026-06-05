@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.0.5] — 2026-06-05
+
+### Fixed
+- **BLE 명령 write의 "거짓 성공"(sent ≠ applied) 제거** — `sendCommand()`가 이전엔 `onCharacteristicWrite` 콜백을 기다리지 않고 즉시 반환(fire-and-forget)했고, write의 `status`와 `writeCharacteristic()`/`writeDescriptor()` 반환값을 무시했다. 그 결과 연결 직후 `START_RAW_EEG` 직후의 노치(50/60Hz) write가 Android GATT 큐 경합(연결당 ATT 연산 1개)으로 조용히 유실될 수 있었다(앱은 "변경 완료"로 표시되나 헤드셋 미반영).
+  - 모든 GATT write(디스크립터/명령)를 단일 직렬 큐 `GattWriteQueue`로 통과 — 한 번에 하나씩, 이전 write의 콜백 이후에만 다음 write 전송.
+  - `sendCommand()`가 `onCharacteristicWrite(GATT_SUCCESS)`까지 실제 suspend하고, 실패 시 예외를 던진다. `gatt == null`이면 더 이상 조용히 무시하지 않고 예외.
+  - 동기 제출 결과와 콜백 `status`를 검사해 busy/실패 시 제한적 재시도(기본 3회, 3s 타임아웃).
+
+### Changed
+- `BleTransport`: 연결 시퀀스(CCCD 알림 활성 → 핸드셰이크)도 동일한 직렬 큐로 처리. 기존 `pendingDescriptors`/`writeNextDescriptor`/`handshakeSent` 경로 제거. GATT 133 재연결, 핸드셰이크 실패 시 관용적 CONNECTED 전환 동작은 유지.
+
+### Notes
+- 공개 API 시그니처(`suspend fun sendCommand(cmd: Byte)`)는 동일하나, 이제 실패 시 throw 가능(`GattWriteException` / `IllegalStateException` / `TimeoutCancellationException`) — 호출부 try/catch 권장.
+- JitPack 배포는 `v2.0.5` 태그로 컷.
+
 ## [2.0.0] — 2026-03-31
 
 ### Breaking Changes
