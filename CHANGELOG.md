@@ -9,7 +9,13 @@ Releases before 7.0.0 are documented in the [legacy changelog (v2.0.5)](https://
 ## [Unreleased]
 
 ### Removed
-- Bluetooth Classic transport (BLE-only from v7.0.0)
+- Bluetooth Classic transport (BLE-only from v7.0.0): `BtClassicTransport`, `TransportType`,
+  the `transport` argument of `NeuroSkySdk.connect()`, `NeuroSkyUUID.SPP`, and
+  `ThinkGearParser.parseByte()` (ThinkGear serial stream)
+
+### Changed
+- `BLUETOOTH`, `BLUETOOTH_ADMIN`, and `ACCESS_FINE_LOCATION` are declared with `maxSdkVersion="30"`,
+  so they are no longer requested on Android 12+ (Android 6–11 still need location for BLE scans)
 
 ### Added
 - eyeBlink parsing
@@ -19,11 +25,10 @@ Releases before 7.0.0 are documented in the [legacy changelog (v2.0.5)](https://
 First release of the renewed MindWave SDK line for Android.
 
 ### Added
-- `NeuroSkySdk` entry point: `connect(deviceAddress, transport)`, `disconnect()`, `sendCommand(cmd)`, `dataFlow`, `connectionState`
+- `NeuroSkySdk` entry point: `connect(deviceAddress)`, `disconnect()`, `sendCommand(cmd)`, `dataFlow`, `connectionState`
 - `findDeviceAddress(deviceName)` to look up a headset's MAC address with a BLE scan
-- BLE transport (default) with reliable, serialized GATT writes: `sendCommand()` suspends until the headset acknowledges the write and throws on failure
-- Bluetooth Classic (SPP) transport, selected explicitly with `TransportType.BT_CLASSIC` (no automatic fallback)
-- `ThinkGearParser` for BLE eSense (`0xEA`/`0xEB`/`0xEC`), Raw EEG, and ThinkGear serial packets
+- BLE transport with reliable, serialized GATT writes: `sendCommand()` suspends until the headset acknowledges the write and throws on failure
+- `ThinkGearParser` for BLE eSense (`0xEA`/`0xEB`/`0xEC`) and Raw EEG packets
 - `BrainWaveData` model with eSense values, eight EEG bands, Raw EEG (512 Hz), and derived `signalQuality`
 - `SimulatorTransport` (`RANDOM` / `FOCUSED` / `RELAXED` / `POOR_SIGNAL`) for development without a headset
 - `NeuroSkyCommand` constants for eSense, Raw EEG, and 50/60 Hz notch filter control

@@ -9,8 +9,6 @@ object NeuroSkyUUID {
     val RAW_EEG    = UUID.fromString("039afff4-2c94-11e3-9e06-0002a5d5c51b")
     val CCCD       = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
-    // BT Classic SPP
-    val SPP        = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
 
     // Device Info (표준 BLE UUID)
     val MANUFACTURER   = UUID.fromString("00002a29-0000-1000-8000-00805f9b34fb")

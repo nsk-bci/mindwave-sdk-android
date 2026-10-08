@@ -131,69 +131,6 @@ class ThinkGearParserTest {
         assertNull(result)
     }
 
-    // ── BT Classic Mode ──────────────────────────────────────────────────────
-
-    @Test
-    fun parseByte_validPacket_returnsAttentionMeditation() {
-        val attention: Byte  = 80
-        val meditation: Byte = 60
-        val payload = byteArrayOf(0x04, attention, 0x05, meditation)
-        val checksum = ((payload.sumOf { it.toInt() and 0xFF } and 0xFF) xor 0xFF) and 0xFF
-
-        val packet = byteArrayOf(
-            0xAA.toByte(), 0xAA.toByte(),
-            payload.size.toByte(),
-            0x04, attention,
-            0x05, meditation,
-            checksum.toByte()
-        )
-
-        val freshParser = ThinkGearParser()
-        var result = null as com.neurosky.sdk.model.BrainWaveData?
-        for (b in packet) result = freshParser.parseByte(b) ?: result
-
-        assertNotNull(result)
-        assertEquals(80, result!!.attention)
-        assertEquals(60, result.meditation)
-    }
-
-    @Test
-    fun parseByte_invalidChecksum_returnsNull() {
-        val packet = byteArrayOf(
-            0xAA.toByte(), 0xAA.toByte(),
-            2,
-            0x04, 80,
-            0xFF.toByte()  // wrong checksum
-        )
-
-        val freshParser = ThinkGearParser()
-        var result = null as com.neurosky.sdk.model.BrainWaveData?
-        for (b in packet) result = freshParser.parseByte(b) ?: result
-
-        assertNull(result)
-    }
-
-    @Test
-    fun parseByte_poorSignalCode_returnsPoorSignal() {
-        val poorSignal: Byte = 150.toByte()
-        val payload = byteArrayOf(0x02, poorSignal)
-        val checksum = ((payload.sumOf { it.toInt() and 0xFF } and 0xFF) xor 0xFF) and 0xFF
-
-        val packet = byteArrayOf(
-            0xAA.toByte(), 0xAA.toByte(),
-            payload.size.toByte(),
-            0x02, poorSignal,
-            checksum.toByte()
-        )
-
-        val freshParser = ThinkGearParser()
-        var result = null as com.neurosky.sdk.model.BrainWaveData?
-        for (b in packet) result = freshParser.parseByte(b) ?: result
-
-        assertNotNull(result)
-        assertEquals(150, result!!.poorSignal)
-    }
-
     // ── SignalQuality ─────────────────────────────────────────────────────────
 
     @Test

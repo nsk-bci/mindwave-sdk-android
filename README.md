@@ -5,7 +5,7 @@
 [![Android](https://img.shields.io/badge/Android-API%2023%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Modern Kotlin SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
+Modern Kotlin SDK for the NeuroSky MindWave Mobile 2 EEG headset over Bluetooth Low Energy (BLE).
 
 > [!NOTE]
 > v7.0.0 continues the MindWave SDK line (legacy 4.x), rebuilt from scratch
@@ -17,7 +17,7 @@ Modern Kotlin SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic
 
 > [!TIP]
 > **Before diving into the steps — read the [Developer Guide](docs/developer-guide.md) first.**  
-> It covers the full connection flow, BLE vs BT Classic internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
+> It covers the full connection flow, BLE internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
 
 ### Step 1 — Add JitPack to repositories
 
@@ -52,12 +52,16 @@ dependencies {
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
 <!-- Android 6–11 (API 23–30) -->
-<uses-permission android:name="android.permission.BLUETOOTH" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.BLUETOOTH"
+    android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+    android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+    android:maxSdkVersion="30" />
 ```
 
 > On Android 12+, runtime permission prompts for `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` are required before connecting.
+> On Android 6–11, BLE scanning requires the `ACCESS_FINE_LOCATION` runtime permission; `maxSdkVersion="30"` keeps it from being requested on Android 12+.
 
 ### Step 4 — Find your device address
 
@@ -78,7 +82,7 @@ lifecycleScope.launch {
         return@launch
     }
 
-    sdk.connect(address)  // BLE — pass TransportType.BT_CLASSIC as second arg for BT Classic
+    sdk.connect(address)
     sdk.sendCommand(NeuroSkyCommand.NOTCH_60HZ)  // Korea/USA; use NOTCH_50HZ for Europe/China
 
     sdk.dataFlow.collect { data ->
@@ -99,30 +103,9 @@ That's it — four steps from zero to streaming EEG data.
 |---|---|
 | Android | API 23 (Android 6.0) |
 | Kotlin | 1.9+ |
-| Bluetooth | BLE adapter (BLE mode) or Classic BT adapter (BT Classic mode) |
-| Device pairing | Not required for BLE; required for BT Classic |
-
-## Connection Modes
-
-`connect()` uses **exactly the transport you pass** — there is no automatic fallback. Pick one explicitly:
-
-```kotlin
-import com.neurosky.sdk.TransportType
-
-// BLE — no device pairing required; omitting TransportType defaults to BLE
-sdk.connect("AA:BB:CC:DD:EE:FF")
-sdk.connect("AA:BB:CC:DD:EE:FF", TransportType.BLE)  // same as above, explicit
-
-// BT Classic — pair the device in Android Settings first
-sdk.connect("AA:BB:CC:DD:EE:FF", TransportType.BT_CLASSIC)
-```
-
-| Transport | When to choose | Pairing required? |
-|---|---|---|
-| `BLE` (default) | Standard use — no pairing, lower power | No |
-| `BT_CLASSIC` | Noisy RF environments where BLE is unstable | Yes |
-
-> **No automatic fallback.** If the chosen transport fails (timeout, adapter unavailable, pairing missing), an exception is thrown. The SDK does not silently retry with the other transport. Handle the exception and prompt the user to choose.
+| Bluetooth | BLE adapter |
+| Device pairing | Not required |
+| Headset | MindWave Mobile 2 (MindWave Mobile 1st gen and third-party TGAM boards are not supported) |
 
 ## Simulator (without a real device)
 
@@ -260,7 +243,6 @@ sdk.sendCommand(NeuroSkyCommand.STOP_RAW_EEG)
 | Transport | Method | Requirement |
 |---|---|---|
 | `BleTransport` | BLE GATT | Android 6.0+, BLE adapter |
-| `BtClassicTransport` | RFCOMM SPP | Paired device in Android Settings |
 | `SimulatorTransport` | Virtual data | For development/testing |
 
 ## ProGuard / R8
@@ -287,14 +269,13 @@ If you maintain your own rules and override the SDK's, add at minimum:
 
 ```
 sdk/src/main/kotlin/com/neurosky/sdk/
-├── NeuroSkySdk.kt              Entry point (BLE or BT Classic, explicit transport selection)
+├── NeuroSkySdk.kt              Entry point (BLE)
 ├── NeuroSkyUUID.kt             BLE UUID constants, command byte constants
 ├── model/
 │   └── BrainWaveData.kt        EEG data model
 ├── transport/
 │   ├── Transport.kt            Common interface, ConnectionState enum
-│   ├── BleTransport.kt         Android BLE GATT implementation
-│   └── BtClassicTransport.kt   Android RFCOMM SPP implementation
+│   └── BleTransport.kt         Android BLE GATT implementation
 ├── parser/
 │   └── ThinkGearParser.kt      ThinkGear packet parser
 └── simulator/
