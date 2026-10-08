@@ -284,6 +284,25 @@ sdk/src/main/kotlin/com/neurosky/sdk/
 
 ## Troubleshooting
 
+### `findDeviceAddress()` returns `null` on Android 6–11
+
+On Android 11 and below (API 23–30), BLE scans need the **`ACCESS_FINE_LOCATION` runtime permission**.
+Declaring it in the manifest is not enough. Without the runtime grant, the scan does not fail — it silently
+returns no results, so `findDeviceAddress()` times out with `null`.
+
+Request it at runtime before scanning (on Android 12+ request `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` instead):
+
+```kotlin
+val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+} else {
+    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)  // Android 6–11: required for BLE scans
+}
+permissionLauncher.launch(permissions)
+```
+
+Some Android 6–11 devices also return no scan results while system **Location** is switched off — ask the user to turn it on.
+
 ### JitPack dependency not resolving
 
 JitPack starts building on first request (1–3 minutes). If Gradle sync fails immediately, follow these steps.

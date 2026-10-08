@@ -34,6 +34,8 @@ class MainActivity : AppCompatActivity() {
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
         } else {
+            // Android 11 이하: BLE 스캔에 위치 권한 런타임 허용이 필수.
+            // 허용되지 않으면 스캔이 오류 없이 빈 결과만 반환한다.
             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
@@ -92,12 +94,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPermissionDeniedDialog() {
+        val message = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            "MindWave 기기에 연결하려면 Bluetooth 권한이 필요합니다.\n" +
+            "설정 → 앱 → 권한에서 '근처 기기'를 허용해주세요."
+        } else {
+            "Android 11 이하에서는 Bluetooth 기기 검색에 위치 권한이 필요합니다.\n" +
+            "위치 정보는 사용하지 않으며, 기기 검색에만 쓰입니다.\n" +
+            "설정 → 앱 → 권한에서 '위치'를 허용하고, 기기의 위치 서비스도 켜주세요."
+        }
         AlertDialog.Builder(this)
             .setTitle("Bluetooth 권한 필요")
-            .setMessage(
-                "MindWave 기기에 연결하려면 Bluetooth 권한이 필요합니다.\n" +
-                "설정 → 앱 → 권한에서 직접 허용해주세요."
-            )
+            .setMessage(message)
             .setPositiveButton("확인", null)
             .show()
     }
