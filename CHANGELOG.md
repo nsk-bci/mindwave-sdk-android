@@ -12,13 +12,17 @@ Releases before 7.0.0 are documented in the [legacy changelog (v2.0.5)](https://
 - Bluetooth Classic transport (BLE-only from v7.0.0): `BtClassicTransport`, `TransportType`,
   the `transport` argument of `NeuroSkySdk.connect()`, `NeuroSkyUUID.SPP`, and
   `ThinkGearParser.parseByte()` (ThinkGear serial stream)
+- `BrainWaveData.eyeBlink` (never populated over BLE) — use `blinkFlow`
 
 ### Changed
 - `BLUETOOTH`, `BLUETOOTH_ADMIN`, and `ACCESS_FINE_LOCATION` are declared with `maxSdkVersion="30"`,
   so they are no longer requested on Android 12+ (Android 6–11 still need location for BLE scans)
 
 ### Added
-- eyeBlink parsing
+- Eye blink detection: `NeuroSkySdk.blinkFlow` emits a `BlinkEvent(timestampMs, strength, sequence)` per blink.
+  `BlinkDetector` watches raw EEG peak-to-peak amplitude (100-sample window, 600 ms cooldown, 500 ms warm-up;
+  threshold provisional until measured on a device). Requires the Raw EEG stream; paused while
+  `poorSignal` > 50.
 
 ## [7.0.0] - TBD
 

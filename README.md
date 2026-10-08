@@ -155,7 +155,6 @@ lifecycleScope.launch {
 | `lowGamma` | `Int` | 0~∞ | 31~39.75 Hz |
 | `midGamma` | `Int` | 0~∞ | 41~49.75 Hz |
 | `rawEeg` | `List<Int>` | -32768~32767 | 512Hz, 10 samples/packet |
-| `eyeBlink` | `Int` | 0~255 | Eye blink intensity |
 | `signalQuality` | `SignalQuality` | enum | NO_SIGNAL/POOR/FAIR/GOOD |
 
 ## Working with dataFlow
@@ -225,6 +224,37 @@ sdk.dataFlow.collect { data ->
     if (data.attention > 0)       updateEsenseUI(data)
 }
 ```
+
+## Eye Blink Detection
+
+Blinks are detected in the raw EEG stream and delivered on a separate `blinkFlow`, one `BlinkEvent` per
+blink, because several blinks can occur within the ~1 s between `BrainWaveData` eSense packets.
+
+```kotlin
+sdk.sendCommand(NeuroSkyCommand.START_RAW_EEG)   // detection needs the raw EEG stream
+
+sdk.blinkFlow.collect { blink ->
+    println("Blink #${blink.sequence} at ${blink.timestampMs}, strength ${blink.strength}")
+}
+```
+
+| `BlinkEvent` field | Type | Meaning |
+|---|---|---|
+| `timestampMs` | `Long` | Detection time (Unix epoch ms) |
+| `strength` | `Int` | Raw EEG peak-to-peak amplitude of the detection window |
+| `sequence` | `Int` | Blinks since `connect()`, starting at 1 |
+
+Detection runs only while the raw EEG stream is on and signal quality is `GOOD` or `FAIR`
+(`poorSignal` ≤ 50). It pauses during `POOR` / `NO_SIGNAL`, because electrode contact noise looks like a blink.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Window | 100 samples (~200 ms) | Peak-to-peak is measured over the most recent samples |
+| Threshold | 3000 (provisional) | Minimum peak-to-peak amplitude, in raw EEG units — to be confirmed by on-device measurement |
+| Cooldown | 600 ms | At most one blink is reported per cooldown |
+| Warm-up | 500 ms | No detection right after the stream starts, after a gap of more than 1 s, or after signal quality recovers |
+
+`SimulatorTransport` does not generate blinks.
 
 ## Commands
 

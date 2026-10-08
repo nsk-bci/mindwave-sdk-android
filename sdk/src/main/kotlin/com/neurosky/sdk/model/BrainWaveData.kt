@@ -14,7 +14,6 @@ data class BrainWaveData(
     val lowGamma: Int = 0,
     val midGamma: Int = 0,
     val rawEeg: List<Int> = emptyList(),  // 10샘플/패킷, 512Hz
-    val eyeBlink: Int = 0,
 ) {
     val signalQuality: SignalQuality
         get() = when {

@@ -57,7 +57,7 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
 - **8 frequency band powers** — Delta, Theta, Alpha (Low/High), Beta (Low/High), Gamma (Low/Mid)
 - **eSense™ Attention** — NeuroSky's proprietary attention index (0~100)
 - **eSense™ Meditation** — NeuroSky's proprietary relaxation index (0~100)
-- **Eye blink detection** — intensity 0~255
+- **Eye blink detection** — detected from raw EEG; delivered as `BlinkEvent`s on `blinkFlow`
 - **Signal quality** — 0 (perfect contact) to 200 (no signal)
 
 ---
@@ -331,7 +331,6 @@ data class BrainWaveData(
     val lowGamma:    Int,           // 31~39.75 Hz band power
     val midGamma:    Int,           // 41~49.75 Hz band power
     val rawEeg:      List<Int>,     // 10 samples/packet, signed 16-bit, 512Hz
-    val eyeBlink:    Int,           // 0 = no blink, 1~255 = blink intensity
 ) {
     val signalQuality: SignalQuality  // derived from poorSignal
 }
@@ -345,7 +344,7 @@ data class BrainWaveData(
 | `attention`, `meditation` | ~1 Hz | eSense™ computed once per second |
 | `delta` through `midGamma` | ~1 Hz | FFT computed once per second |
 | `rawEeg` | 512 Hz | 10 samples per packet, ~51 packets/sec |
-| `eyeBlink` | Event-driven | Only non-zero when blink detected |
+| `blinkFlow` (`BlinkEvent`) | Event-driven | Separate stream; one event per detected blink. Requires `START_RAW_EEG` |
 
 > When `rawEeg` packets arrive, `attention`, `meditation`, and frequency band fields are `0` in that object — they only appear in the eSense packet which arrives separately. Filter by checking which fields are non-zero.
 
@@ -912,6 +911,7 @@ class NeuroSkySdk(context: Context)
 |---|---|---|
 | `connectionState` | `StateFlow<ConnectionState>` | Current connection state; hot Flow, always has a value |
 | `dataFlow` | `Flow<BrainWaveData>` | Returns `activeTransport.dataFlow` at call time — collect **after** `connect()` |
+| `blinkFlow` | `Flow<BlinkEvent>` | One `BlinkEvent(timestampMs, strength, sequence)` per detected blink. Needs `START_RAW_EEG`; silent while `signalQuality` is `POOR`/`NO_SIGNAL` |
 | `connect(deviceAddress)` | `suspend fun` | Connects over BLE |
 | `disconnect()` | `suspend fun` | Gracefully closes the active transport |
 | `sendCommand(cmd: Byte)` | `suspend fun` | Sends a control byte to the headset |
@@ -940,7 +940,6 @@ Immutable data class emitted by `dataFlow`.
 | `lowGamma` | `Int` | 0~∞ | Low Gamma, 31~39.75 Hz |
 | `midGamma` | `Int` | 0~∞ | Mid Gamma, 41~49.75 Hz |
 | `rawEeg` | `List<Int>` | -32768~32767 | 512Hz ADC samples (10 per packet) |
-| `eyeBlink` | `Int` | 0~255 | Eye blink intensity; 0 = no blink |
 | `signalQuality` | `SignalQuality` | enum | Derived from `poorSignal` |
 
 ---
