@@ -3,7 +3,7 @@ title: NeuroSky MindWave Mobile Android SDK — Developer Guide
 ---
 
 # NeuroSky MindWave Mobile Android SDK
-## Developer Guide · v2.0.1
+## Developer Guide · v7.0.0
 
 ---
 
@@ -163,7 +163,7 @@ In `app/build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.nsk-bci:mindwave-sdk-android:v2.0.1")
+    implementation("com.github.nsk-bci:mindwave-sdk-android:v7.0.0")
 }
 ```
 
@@ -1041,5 +1041,5 @@ object NeuroSkyCommand
 
 ---
 
-*NeuroSky MindWave Mobile Android SDK v2.0.2 · Apache License 2.0*
+*NeuroSky MindWave Mobile Android SDK v7.0.0 · Apache License 2.0*
 *github.com/nsk-bci/mindwave-sdk-android*

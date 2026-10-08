@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### Removed
+- Bluetooth Classic transport (BLE-only from v7.0.0)
+
+### Added
+- eyeBlink parsing
+
+## [7.0.0] - TBD
+
+### Changed
+- Version scheme realigned with the MindWave SDK line (legacy 4.x)
+- The published version is now taken from the Git tag (`sdk/build.gradle.kts`) instead of a hard-coded value
+- README install example updated to `v7.0.0`
+
+### Added
+- `LICENSE` (Apache License 2.0, full text)
+- `jitpack.yml` pinning the JitPack build to JDK 17
+
+### Removed
+- `.github/workflows/publish.yml` ("Publish to Maven Central") — the SDK is distributed via JitPack, which builds on demand from tags, and the `com.github.nsk-bci` namespace cannot be published to Maven Central
+
 ## [2.0.5] — 2026-06-05
 
 ### Fixed
