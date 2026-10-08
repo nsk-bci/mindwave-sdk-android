@@ -12,6 +12,7 @@ class NeuroSkySdk(context: Context)
 |---|---|---|
 | `connectionState` | `StateFlow<ConnectionState>` | 현재 연결 상태 (NeuroSkySdk 전용; Transport 직접 사용 시에는 `stateFlow` 사용) |
 | `dataFlow` | `Flow<BrainWaveData>` | 실시간 뇌파 데이터 스트림 — `connect()` 이후에 수집할 것 |
+| `blinkFlow` | `Flow<BlinkEvent>` | 눈 깜빡임 이벤트 스트림 — Raw EEG 활성화 필요, signalQuality가 POOR/NO_SIGNAL이면 방출 안 함 |
 | `connect(deviceAddress)` | `suspend fun` | BLE로 연결 |
 | `disconnect()` | `suspend fun` | 연결 해제 |
 | `sendCommand(cmd: Byte)` | `suspend fun` | 헤드셋에 명령 전송 |
@@ -44,11 +45,22 @@ data class BrainWaveData(...)
 | `lowGamma` | `Int` | 0~... | 31~39.75 Hz 파워 |
 | `midGamma` | `Int` | 0~... | 41~49.75 Hz 파워 (`highGamma` 아님) |
 | `rawEeg` | `List<Int>` | — | 10샘플/패킷 (512 Hz), 부호 있는 정수 |
-| `eyeBlink` | `Int` | 0~255 | 눈 깜빡임 강도 |
 | `signalQuality` | `SignalQuality` | enum | poorSignal 기반 자동 계산 |
 
 > **필드명 패턴:** `low`/`high`/`mid` 가 **앞**에 옵니다 — `lowAlpha`, `highAlpha`, `lowBeta`, `highBeta`, `lowGamma`, `midGamma`.  
 > `alphaLow`, `betaHigh` 등의 형태는 컴파일 오류입니다.
+
+## BlinkEvent
+
+```kotlin
+data class BlinkEvent(val timestampMs: Long, val strength: Int, val sequence: Int)
+```
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `timestampMs` | `Long` | 검출 시각 (Unix epoch ms) |
+| `strength` | `Int` | 검출 윈도우(100샘플)의 raw EEG peak-to-peak 진폭 |
+| `sequence` | `Int` | `connect()` 이후 누적 횟수 (1부터) |
 
 ### SignalQuality
 

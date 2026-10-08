@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import com.neurosky.sdk.NeuroSkyCommand
 import com.neurosky.sdk.NeuroSkyUUID
+import com.neurosky.sdk.model.BlinkEvent
 import com.neurosky.sdk.model.BrainWaveData
 import com.neurosky.sdk.parser.ThinkGearParser
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +30,8 @@ class BleTransport(private val context: Context) : Transport {
     private val _stateFlow = MutableStateFlow(ConnectionState.DISCONNECTED)
     override val stateFlow: Flow<ConnectionState> = _stateFlow
 
-    private val parser = ThinkGearParser()
+    private val _blinkFlow = MutableSharedFlow<BlinkEvent>(extraBufferCapacity = 16)
+    private val parser = ThinkGearParser(onBlink = { _blinkFlow.tryEmit(it) })
     private var gatt: BluetoothGatt? = null
     private val bluetoothAdapter =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
@@ -149,6 +151,8 @@ class BleTransport(private val context: Context) : Transport {
 
     override val dataFlow: Flow<BrainWaveData> = _dataFlow
 
+    override val blinkFlow: Flow<BlinkEvent> = _blinkFlow
+
     override suspend fun connect(deviceAddress: String) {
         log("connect() → $deviceAddress")
         gatt?.disconnect()
@@ -156,6 +160,7 @@ class BleTransport(private val context: Context) : Transport {
         gatt = null
         retryCount = 0
         lastDeviceAddress = deviceAddress
+        parser.reset()  // 새 연결: 깜빡임 횟수·검출기 초기화
         _stateFlow.value = ConnectionState.CONNECTING
         attemptConnectGatt(deviceAddress)
     }

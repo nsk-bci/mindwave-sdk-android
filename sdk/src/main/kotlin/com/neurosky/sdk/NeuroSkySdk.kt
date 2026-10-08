@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import com.neurosky.sdk.model.BlinkEvent
 import com.neurosky.sdk.model.BrainWaveData
 import com.neurosky.sdk.transport.BleTransport
 import com.neurosky.sdk.transport.ConnectionState
@@ -72,6 +73,12 @@ class NeuroSkySdk(private val context: Context) {
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     val dataFlow: Flow<BrainWaveData> get() = activeTransport.dataFlow
+
+    /**
+     * 눈 깜빡임 이벤트 스트림. raw EEG에서 검출하므로 [NeuroSkyCommand.START_RAW_EEG]로
+     * Raw EEG 스트림을 켜야 하고, 신호 품질이 POOR/NO_SIGNAL인 동안에는 방출하지 않는다.
+     */
+    val blinkFlow: Flow<BlinkEvent> get() = activeTransport.blinkFlow
 
     /**
      * 디바이스에 연결한다.
