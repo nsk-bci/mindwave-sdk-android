@@ -16,10 +16,12 @@
 - README install example updated to `v7.0.0`
 
 ### Added
+- `NOTICE` (Copyright 2024-2026 NeuroSky, Inc.)
 - `LICENSE` (Apache License 2.0, full text)
 - `jitpack.yml` pinning the JitPack build to JDK 17
 
 ### Removed
+- `Developer-guide.pdf` and `docs/developer-guide.pdf` — superseded by `docs/developer-guide.md`; integrated developer and user guides will follow
 - `.github/workflows/publish.yml` ("Publish to Maven Central") — the SDK is distributed via JitPack, which builds on demand from tags, and the `com.github.nsk-bci` namespace cannot be published to Maven Central
 
 ## [2.0.5] — 2026-06-05

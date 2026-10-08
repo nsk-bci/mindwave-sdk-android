@@ -16,7 +16,7 @@ Modern Kotlin SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic
 ## Getting Started
 
 > [!TIP]
-> **Before diving into the steps — read the [Developer Guide (PDF)](docs/developer-guide.pdf) first.**  
+> **Before diving into the steps — read the [Developer Guide](docs/developer-guide.md) first.**  
 > It covers the full connection flow, BLE vs BT Classic internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
 
 ### Step 1 — Add JitPack to repositories
