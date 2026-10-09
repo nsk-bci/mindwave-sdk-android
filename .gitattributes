@@ -1,0 +1,4 @@
+# Wrapper scripts: Unix script must keep LF, Windows batch file must keep CRLF.
+gradlew      text eol=lf
+*.bat        text eol=crlf
+*.jar        binary
