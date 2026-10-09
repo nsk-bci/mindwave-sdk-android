@@ -1,0 +1,49 @@
+# TEMPORARY — verifies R3/R4: the Gradle wrapper runs directly (no `bash` prefix) on every OS,
+# both from a checkout and from a source ZIP made like GitHub's "Source code (zip)" (git archive).
+name: Wrapper check
+on: pull_request
+jobs:
+  wrapper:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: android-actions/setup-android@v3
+      - name: Report commit and file modes
+        shell: bash
+        run: |
+          git log -1 --format='commit %h %s'
+          git ls-files -s gradlew gradlew.bat
+      - name: Checkout — run wrapper directly (Unix)
+        if: runner.os != 'Windows'
+        run: ./gradlew --no-daemon :sdk:assembleRelease :sdk:testDebugUnitTest
+      - name: Checkout — run wrapper directly (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: gradlew.bat --no-daemon :sdk:assembleRelease :sdk:testDebugUnitTest
+      - name: Source ZIP (git archive) into an empty folder
+        shell: bash
+        run: |
+          git archive --format=zip -o "$RUNNER_TEMP/src.zip" HEAD
+          mkdir "$RUNNER_TEMP/src"
+      - name: Source ZIP — unzip and run wrapper directly (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd "$RUNNER_TEMP/src" && unzip -q ../src.zip
+          ls -l gradlew
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          ./gradlew --no-daemon :sdk:assembleRelease
+      - name: Source ZIP — unzip and run wrapper directly (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive "$env:RUNNER_TEMP\src.zip" "$env:RUNNER_TEMP\src"
+          Set-Location "$env:RUNNER_TEMP\src"
+          "sdk.dir=$($env:ANDROID_HOME -replace '\','\')" | Out-File -Encoding ascii local.properties
+          cmd /c "gradlew.bat --no-daemon :sdk:assembleRelease"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
