@@ -13,11 +13,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
-      - uses: android-actions/setup-android@v3
       - name: Report commit and file modes
         shell: bash
         run: |
           git log -1 --format='commit %h %s'
+          echo "ANDROID_HOME=$ANDROID_HOME"
           git ls-files -s gradlew gradlew.bat
       - name: Checkout — run wrapper directly (Unix)
         if: runner.os != 'Windows'
