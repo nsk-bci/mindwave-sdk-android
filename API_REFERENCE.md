@@ -81,31 +81,7 @@ interface Transport {
 }
 ```
 
-구현체: `BleTransport`, `SimulatorTransport`
-
----
-
-## SimulatorTransport
-
-```kotlin
-class SimulatorTransport : Transport  // 패키지: com.neurosky.sdk.simulator
-```
-
-| 멤버 | 설명 |
-|---|---|
-| `stateFlow` | `Flow<ConnectionState>` — Transport 인터페이스 프로퍼티. `connectionState`가 아님 |
-| `dataFlow` | `Flow<BrainWaveData>` — 1초 주기 emit |
-| `setMode(mode: Mode)` | 데이터 생성 모드 변경 (다음 emit 부터 반영) |
-| `connect(deviceAddress)` | 임의 문자열 허용, 500ms 후 CONNECTED |
-| `Mode.RANDOM` | 무작위 값 |
-| `Mode.FOCUSED` | Attention 70~100, Meditation 40~60 |
-| `Mode.RELAXED` | Attention 20~50, Meditation 70~100 |
-| `Mode.POOR_SIGNAL` | poorSignal 150~200, Attention/Meditation = 0 |
-
-> **`connectionState` vs `stateFlow`:**  
-> - `NeuroSkySdk.connectionState` → `StateFlow<ConnectionState>` (항상 최신 값 보유, hot)  
-> - `SimulatorTransport.stateFlow` → `Flow<ConnectionState>` (Transport 인터페이스, cold-ish)  
-> Transport를 직접 사용할 때는 `stateFlow`를 사용하세요.
+구현체: `BleTransport`
 
 ---
 

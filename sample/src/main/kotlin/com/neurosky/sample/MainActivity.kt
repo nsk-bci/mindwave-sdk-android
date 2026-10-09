@@ -2,7 +2,6 @@ package com.neurosky.sample
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -12,13 +11,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.button.MaterialButton
 import com.neurosky.sample.MainViewModel.RecordingState
 import com.neurosky.sample.MainViewModel.ReconnectState
 import com.neurosky.sample.databinding.ActivityMainBinding
 import com.neurosky.sdk.model.BrainWaveData
 import com.neurosky.sdk.model.SignalQuality
-import com.neurosky.sdk.simulator.SimulatorTransport
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -52,10 +49,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        setupModeButtons()
-        viewModel.setSimulatorMode(SimulatorTransport.Mode.FOCUSED)
-        highlightActiveMode(binding.btnFocused)
 
         binding.btnCancelReconnect.setOnClickListener { viewModel.cancelReconnect() }
         binding.btnStartRecording.setOnClickListener { viewModel.startRecording() }
@@ -176,43 +169,6 @@ class MainActivity : AppCompatActivity() {
                         binding.tvRecordingStatus.setTextColor(0xFF1565C0.toInt())  // blue 800
                     }
                 }
-            }
-        }
-    }
-
-    // ── Simulator mode buttons ────────────────────────────────────
-
-    private fun setupModeButtons() {
-        val modeMap = mapOf(
-            binding.btnRandom     to SimulatorTransport.Mode.RANDOM,
-            binding.btnFocused    to SimulatorTransport.Mode.FOCUSED,
-            binding.btnRelaxed    to SimulatorTransport.Mode.RELAXED,
-            binding.btnPoorSignal to SimulatorTransport.Mode.POOR_SIGNAL
-        )
-        modeMap.forEach { (btn, mode) ->
-            btn.setOnClickListener {
-                viewModel.setSimulatorMode(mode)
-                highlightActiveMode(btn)
-            }
-        }
-    }
-
-    private fun highlightActiveMode(active: MaterialButton) {
-        val allButtons = listOf(
-            binding.btnRandom, binding.btnFocused,
-            binding.btnRelaxed, binding.btnPoorSignal
-        )
-        val primaryColor = getColor(R.color.colorPrimary)
-        allButtons.forEach { btn ->
-            if (btn == active) {
-                btn.setBackgroundColor(primaryColor)
-                btn.setTextColor(Color.WHITE)
-                btn.strokeWidth = 0
-            } else {
-                btn.setBackgroundColor(Color.TRANSPARENT)
-                btn.setTextColor(primaryColor)
-                btn.strokeColor = android.content.res.ColorStateList.valueOf(primaryColor)
-                btn.strokeWidth = 2
             }
         }
     }

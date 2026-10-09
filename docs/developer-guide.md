@@ -19,12 +19,11 @@ title: NeuroSky MindWave Mobile Android SDK — Developer Guide
 8. [EEG Frequency Bands Explained](#8-eeg-frequency-bands-explained)
 9. [Signal Quality](#9-signal-quality)
 10. [Commands](#10-commands)
-11. [Simulator — Develop Without Hardware](#11-simulator--develop-without-hardware)
-12. [Error Handling & Reconnection](#12-error-handling--reconnection)
-13. [Advanced Patterns](#13-advanced-patterns)
-14. [Troubleshooting](#14-troubleshooting)
-15. [Testing](#15-testing)
-16. [API Reference](#16-api-reference)
+11. [Error Handling & Reconnection](#11-error-handling--reconnection)
+12. [Advanced Patterns](#12-advanced-patterns)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Testing](#14-testing)
+15. [API Reference](#15-api-reference)
 
 ---
 
@@ -45,7 +44,6 @@ This SDK eliminates TGC entirely by communicating directly with the MindWave Mob
 | No TGC dependency | Communicates with hardware directly via Android Bluetooth APIs |
 | BLE only | No pairing required; Bluetooth Classic is not supported |
 | Kotlin Coroutines & Flow | `Flow<BrainWaveData>` — integrates naturally with Jetpack lifecycle |
-| Built-in Simulator | Full data simulation without any hardware |
 | JitPack distribution | One-line Gradle dependency, no local setup |
 | Android 6.0+ (API 23+) | Wide device coverage |
 
@@ -85,8 +83,6 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
         │   ├── BleTransport                      │
         │   │    Android BLE GATT                 │
         │   │    (BluetoothGatt + callbacks)       │
-        │   └── SimulatorTransport               │
-        │        (virtual data, no hardware)      │
         │          ↓                              │
         │   ThinkGearParser                       │
         │    decodes 0xEA / 0xEB / 0xEC packets   │
@@ -528,95 +524,7 @@ sdk.sendCommand(NeuroSkyCommand.START_ESENSE)
 
 ---
 
-## 11. Simulator — Develop Without Hardware
-
-`SimulatorTransport` generates synthetic EEG data without any MindWave Mobile hardware. It implements `Transport`, so your application code remains unchanged between development and production.
-
-### Why use the Simulator
-
-- **No hardware required** — build and test UI, data flows, and business logic immediately
-- **Predictable data** — use `FOCUSED` mode to always generate high-attention values for UI testing
-- **Edge case testing** — `POOR_SIGNAL` mode tests your error-handling and reconnect logic
-- **CI/CD pipelines** — run Espresso or unit tests on build servers without Bluetooth hardware
-
-### Basic usage
-
-```kotlin
-import com.neurosky.sdk.simulator.SimulatorTransport  // package: simulator, NOT transport
-
-val simulator = SimulatorTransport()
-simulator.setMode(SimulatorTransport.Mode.FOCUSED)
-
-lifecycleScope.launch {
-    simulator.connect("simulator")  // any string accepted; CONNECTED after ~500 ms
-
-    simulator.dataFlow.collect { data ->
-        Log.d("SIM", "Attention: ${data.attention}, Meditation: ${data.meditation}")
-    }
-}
-```
-
-> **`stateFlow` vs `connectionState`:**
-> `SimulatorTransport` (and all `Transport` implementations) expose `stateFlow: Flow<ConnectionState>` from the `Transport` interface.
-> `connectionState: StateFlow<ConnectionState>` is a property of `NeuroSkySdk` only — it does **not** exist on `SimulatorTransport` or the `Transport` interface directly.
->
-> ```kotlin
-> // Wrong — connectionState does not exist on SimulatorTransport
-> simulator.connectionState.collect { }   // compile error
->
-> // Correct — use stateFlow (Transport interface)
-> simulator.stateFlow.collect { state -> /* CONNECTED, DISCONNECTED, … */ }
-> ```
-```
-
-### Simulator modes
-
-| Mode | Attention | Meditation | PoorSignal | Use case |
-|---|---|---|---|---|
-| `RANDOM` | 0~100 (random) | 0~100 (random) | 0 | General integration testing |
-| `FOCUSED` | 70~100 | 40~60 | 0 | High-attention UI testing |
-| `RELAXED` | 20~50 | 70~100 | 0 | High-meditation UI testing |
-| `POOR_SIGNAL` | 0 | 0 | 150~200 | Signal loss and error handling |
-
-### Switching modes at runtime
-
-```kotlin
-val simulator = SimulatorTransport()
-simulator.setMode(SimulatorTransport.Mode.POOR_SIGNAL)
-
-lifecycleScope.launch {
-    simulator.connect("simulator")
-
-    // Simulate signal recovery after 5 seconds
-    delay(5000)
-    simulator.setMode(SimulatorTransport.Mode.FOCUSED)
-
-    simulator.dataFlow.collect { data -> /* ... */ }
-}
-```
-
-### Using in ViewModel with dependency injection
-
-```kotlin
-// Swap between simulator and real SDK via DI or build flavor
-class EegViewModel(
-    private val transport: Transport  // injected: NeuroSkySdk or SimulatorTransport
-) : ViewModel() {
-
-    val data: Flow<BrainWaveData> = transport.dataFlow
-    val state: Flow<ConnectionState> = transport.stateFlow
-
-    fun connect(address: String) {
-        viewModelScope.launch {
-            transport.connect(address)
-        }
-    }
-}
-```
-
----
-
-## 12. Error Handling & Reconnection
+## 11. Error Handling & Reconnection
 
 ### Connection errors
 
@@ -682,7 +590,7 @@ sdk.dataFlow.collect { data ->
 
 ---
 
-## 13. Advanced Patterns
+## 12. Advanced Patterns
 
 ### ViewModel + StateFlow for Compose or XML UI
 
@@ -816,7 +724,7 @@ class EegForegroundService : Service() {
 
 ---
 
-## 14. Troubleshooting
+## 13. Troubleshooting
 
 ### Connection issues
 
@@ -843,9 +751,7 @@ class EegForegroundService : Service() {
 |---|---|---|
 | `Could not resolve com.github.nsk-bci:mindwave-sdk-android` | JitPack not in repository list | Add `maven { url = uri("https://jitpack.io") }` to `settings.gradle.kts` |
 | `Unresolved reference: NeuroSkySdk` | Missing `import` | Add `import com.neurosky.sdk.NeuroSkySdk` |
-| `Unresolved reference: SimulatorTransport` | Wrong import | Use `import com.neurosky.sdk.simulator.SimulatorTransport` (package is `simulator`, not `transport`) |
 | `Unresolved reference: TransportType` | Removed in v7.0.0 | The SDK is BLE-only. Call `connect(deviceAddress)` without a transport argument |
-| `Unresolved reference: connectionState` on simulator | Wrong API | `connectionState` belongs to `NeuroSkySdk`. Use `simulator.stateFlow` instead |
 | `Unresolved reference: alphaLow` / `betaHigh` | Wrong field name order | Field names are `lowAlpha`, `highAlpha`, `lowBeta`, `highBeta`, `lowGamma`, `midGamma` — modifier first |
 | First build very slow | JitPack building from source | Normal — only happens once; subsequent builds use cache |
 
@@ -859,7 +765,7 @@ class EegForegroundService : Service() {
 
 ---
 
-## 15. Testing
+## 14. Testing
 
 The SDK ships with a unit test suite for `ThinkGearParser` — the BLE packet parser. These tests require no hardware or Bluetooth adapter and run on the JVM directly.
 
@@ -898,7 +804,7 @@ sdk/src/test/kotlin/com/neurosky/sdk/parser/
 
 ---
 
-## 16. API Reference
+## 15. API Reference
 
 ### `NeuroSkySdk`
 
@@ -976,7 +882,7 @@ Derived from `BrainWaveData.poorSignal`.
 
 ### `Transport` (interface)
 
-Common interface implemented by `BleTransport` and `SimulatorTransport`.
+Common interface implemented by `BleTransport`.
 
 ```kotlin
 interface Transport {
@@ -987,22 +893,6 @@ interface Transport {
     suspend fun sendCommand(cmd: Byte)
 }
 ```
-
----
-
-### `SimulatorTransport`
-
-```kotlin
-class SimulatorTransport : Transport
-```
-
-| Member | Description |
-|---|---|
-| `setMode(mode: Mode)` | Change simulation mode; takes effect on next emitted packet |
-| `Mode.RANDOM` | Random Attention and Meditation values each tick |
-| `Mode.FOCUSED` | Attention 70~100, Meditation 40~60 |
-| `Mode.RELAXED` | Attention 20~50, Meditation 70~100 |
-| `Mode.POOR_SIGNAL` | PoorSignal 150~200, Attention 0, Meditation 0 |
 
 ---
 
