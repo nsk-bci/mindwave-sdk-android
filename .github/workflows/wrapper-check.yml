@@ -44,6 +44,7 @@ jobs:
         run: |
           Expand-Archive "$env:RUNNER_TEMP\src.zip" "$env:RUNNER_TEMP\src"
           Set-Location "$env:RUNNER_TEMP\src"
-          "sdk.dir=$($env:ANDROID_HOME -replace '\','\')" | Out-File -Encoding ascii local.properties
+          "sdk.dir=$($env:ANDROID_HOME.Replace([char]92, [char]47))" | Out-File -Encoding ascii local.properties
+          Get-Content local.properties
           cmd /c "gradlew.bat --no-daemon :sdk:assembleRelease"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
