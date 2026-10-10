@@ -30,15 +30,15 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # gradlew is committed without the executable bit — invoke it through bash.
+      # Run the wrapper directly (no `bash` prefix): a lost executable bit on gradlew fails here.
       - name: Unit tests (sdk)
-        run: bash ./gradlew --no-daemon :sdk:testDebugUnitTest
+        run: ./gradlew --no-daemon :sdk:testDebugUnitTest
 
       - name: Build SDK AAR (release)
-        run: bash ./gradlew --no-daemon :sdk:assembleRelease
+        run: ./gradlew --no-daemon :sdk:assembleRelease
 
       - name: Build sample app (debug)
-        run: bash ./gradlew --no-daemon :sample:assembleDebug
+        run: ./gradlew --no-daemon :sample:assembleDebug
 
       - name: Upload test reports
         if: failure()
