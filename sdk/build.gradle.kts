@@ -38,6 +38,23 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
 
+// The Git tag is the single source of truth for the SDK version.
+// JitPack builds a tag with `-Pversion=<tag>`; otherwise fall back to `git describe`
+// (exactly "7.0.0" on a tag, "7.0.0-3-gabc1234" between tags).
+val sdkVersion: String = run {
+    val requested = project.version.toString()
+    if (requested != Project.DEFAULT_VERSION) {
+        return@run requested.removePrefix("v")
+    }
+    val describe = runCatching {
+        providers.exec {
+            commandLine("git", "describe", "--tags", "--match", "v[0-9]*")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim()
+    }.getOrDefault("")
+    describe.removePrefix("v").ifEmpty { "0.0.0-SNAPSHOT" }
+}
+
 afterEvaluate {
     publishing {
         publications {
@@ -45,7 +62,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.nsk-bci"
                 artifactId = "mindwave-sdk-android"
-                version = "2.0.0"
+                version = sdkVersion
             }
         }
     }

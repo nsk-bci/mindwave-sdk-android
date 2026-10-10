@@ -7,12 +7,16 @@
 
 Modern Kotlin SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
 
+> [!NOTE]
+> v7.0.0 continues the MindWave SDK line (legacy 4.x), rebuilt from scratch
+> for the BLE-only MindWave Mobile 2. Bluetooth Classic support is removed.
+
 ---
 
 ## Getting Started
 
 > [!TIP]
-> **Before diving into the steps — read the [Developer Guide (PDF)](docs/developer-guide.pdf) first.**  
+> **Before diving into the steps — read the [Developer Guide](docs/developer-guide.md) first.**  
 > It covers the full connection flow, BLE vs BT Classic internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
 
 ### Step 1 — Add JitPack to repositories
@@ -33,7 +37,7 @@ dependencyResolutionManagement {
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.nsk-bci:mindwave-sdk-android:v2.0.3")
+    implementation("com.github.nsk-bci:mindwave-sdk-android:v7.0.0")
 }
 ```
 
@@ -306,7 +310,7 @@ JitPack starts building on first request (1–3 minutes). If Gradle sync fails i
 **1. Check the build log**
 
 ```
-https://jitpack.io/com/github/nsk-bci/mindwave-sdk-android/v2.0.3/build.log
+https://jitpack.io/com/github/nsk-bci/mindwave-sdk-android/v7.0.0/build.log
 ```
 
 **2. Build in progress** — if the log shows "build in progress", wait 2–3 minutes and retry Gradle sync.
@@ -330,18 +334,7 @@ implementation("com.github.nsk-bci:mindwave-sdk-android:FULL_COMMIT_SHA")
 
 ## Changelog
 
-### v2.0.1
-- `BleTransport` / `BtClassicTransport` — `callbackFlow` → `MutableSharedFlow`: GATT/socket lifetime now fully controlled by `connect()`/`disconnect()`, stopping collection no longer drops the connection
-- `ThinkGearParser` — BT Classic `0x83` bounds guard: prevents `IndexOutOfBoundsException` on truncated payloads
-- `NeuroSkySdk` KDoc — `deviceAddress` parameter now explicitly states MAC address format
-
-### v2.0.0
-- BLE GATT Transport (`BleTransport`) — `connectGatt()` → CCCD subscribe → Handshake(`0x17`) → data stream
-- BT Classic SPP Transport (`BtClassicTransport`) — RFCOMM `00001101-...` socket
-- `ThinkGearParser` — BLE(`0xEA`/`0xEB`/`0xEC`) + BT Classic(`0xAA 0xAA` header, checksum validation)
-- `BrainWaveData.signalQuality` — derived from `poorSignal`: GOOD/FAIR/POOR/NO_SIGNAL
-- `SimulatorTransport` — FOCUSED/RELAXED/RANDOM/POOR_SIGNAL modes, emits every 1 second
-- Kotlin 1.9, Coroutines 1.7.3, minSdk 23
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

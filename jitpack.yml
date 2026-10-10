@@ -1,0 +1,4 @@
+# JitPack build environment. AGP 8.x requires JDK 17; pin it so JitPack
+# does not fall back to its default JDK and fail where local builds pass.
+jdk:
+  - openjdk17

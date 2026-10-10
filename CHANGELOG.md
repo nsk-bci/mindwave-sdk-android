@@ -1,136 +1,40 @@
 # Changelog
 
-## [2.0.5] — 2026-06-05
+All notable changes to the NeuroSky MindWave Mobile Android SDK are documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Fixed
-- **BLE 명령 write의 "거짓 성공"(sent ≠ applied) 제거** — `sendCommand()`가 이전엔 `onCharacteristicWrite` 콜백을 기다리지 않고 즉시 반환(fire-and-forget)했고, write의 `status`와 `writeCharacteristic()`/`writeDescriptor()` 반환값을 무시했다. 그 결과 연결 직후 `START_RAW_EEG` 직후의 노치(50/60Hz) write가 Android GATT 큐 경합(연결당 ATT 연산 1개)으로 조용히 유실될 수 있었다(앱은 "변경 완료"로 표시되나 헤드셋 미반영).
-  - 모든 GATT write(디스크립터/명령)를 단일 직렬 큐 `GattWriteQueue`로 통과 — 한 번에 하나씩, 이전 write의 콜백 이후에만 다음 write 전송.
-  - `sendCommand()`가 `onCharacteristicWrite(GATT_SUCCESS)`까지 실제 suspend하고, 실패 시 예외를 던진다. `gatt == null`이면 더 이상 조용히 무시하지 않고 예외.
-  - 동기 제출 결과와 콜백 `status`를 검사해 busy/실패 시 제한적 재시도(기본 3회, 3s 타임아웃).
+v7.0.0 continues the MindWave SDK line (legacy 4.x), rebuilt from scratch for the BLE-only MindWave Mobile 2.
+Releases before 7.0.0 are documented in the [legacy changelog (v2.0.5)](https://github.com/nsk-bci/mindwave-sdk-android/blob/v2.0.5/CHANGELOG.md).
 
-### Changed
-- `BleTransport`: 연결 시퀀스(CCCD 알림 활성 → 핸드셰이크)도 동일한 직렬 큐로 처리. 기존 `pendingDescriptors`/`writeNextDescriptor`/`handshakeSent` 경로 제거. GATT 133 재연결, 핸드셰이크 실패 시 관용적 CONNECTED 전환 동작은 유지.
-
-### Notes
-- 공개 API 시그니처(`suspend fun sendCommand(cmd: Byte)`)는 동일하나, 이제 실패 시 throw 가능(`GattWriteException` / `IllegalStateException` / `TimeoutCancellationException`) — 호출부 try/catch 권장.
-- JitPack 배포는 `v2.0.5` 태그로 컷.
-
-## [2.0.0] — 2026-03-31
-
-### Breaking Changes
-- TGC(ThinkGear Connector) 완전 제거 — `ThinkGearConnector` 클래스 및 TCP 소켓 레이어 삭제
-- Android 최소 지원 버전: API 23 (Android 6.0) — `BluetoothLeScanner` 의존
-
-### Added
-
-#### BLE Transport (`BleTransport.kt`)
-- `BluetoothLeScanner`로 `MindWave Mobile` 디바이스 스캔
-- `connectGatt()` → `onServicesDiscovered()` 후 eSense(`039afff8`) + RawEEG(`039afff4`) characteristic 알림 구독
-- `onDescriptorWrite()` 완료 후 Handshake 전송 → 데이터 수신 시작
-- 핸드셰이크 패킷: 20바이트 고정, `[0]=0x77`, `[2]=명령바이트`, `[19]=체크섬`
-
-#### BT Classic Transport (`BtClassicTransport.kt`)
-- SPP UUID `00001101-0000-1000-8000-00805f9b34fb`로 `createRfcommSocketToServiceRecord()` 연결
-- `InputStream` 백그라운드 스레드에서 1바이트씩 읽어 `ThinkGearParser.parseByte()` 위임
-
-#### ThinkGear Parser (`ThinkGearParser.kt`)
-- **BLE 모드** — `parse(uuid, bytes)`: characteristic UUID 기반 분기
-  - `0xEA` 패킷: `bytes[6]`=PoorSignal, `bytes[8]`=Attention, `bytes[10]`=Meditation
-  - `0xEB` 패킷: `bytes[5~7]`=Delta, `bytes[9~11]`=Theta, `bytes[13~15]`=LowAlpha, `bytes[17~19]`=HighAlpha
-  - `0xEC` 패킷: `bytes[5~7]`=LowBeta, `bytes[9~11]`=HighBeta, `bytes[13~15]`=LowGamma, `bytes[17~19]`=MidGamma
-  - RawEEG: 20바이트 → 2바이트씩 10샘플, `raw > 32768이면 raw -= 65536`(부호처리)
-- **BT Classic 모드** — `parseByte(byte)`: `0xAA 0xAA` 동기 헤더 → PLENGTH → PAYLOAD → 체크섬 검증
-  - 코드 `0x02`=PoorSignal, `0x04`=Attention, `0x05`=Meditation, `0x16`=Blink
-  - 코드 `0x80`=Raw EEG 2바이트, `0x83`=EEG Power 24바이트(8밴드 × 3바이트 빅엔디언)
-  - 체크섬: `(payload 합산 XOR 0xFF) AND 0xFF`
-
-#### SDK Entry Point (`NeuroSkySdk.kt`)
-- `connect(deviceAddress, transport)`: 지정한 Transport로 연결. 기본값 BLE. BLE→BT Classic 자동 폴백 없음 — 연결 방식은 호출자가 명시적으로 선택
-- `dataFlow: Flow<BrainWaveData>` — 활성 Transport를 통한 단일 데이터 스트림
-- `sendCommand(cmd: Byte)` — 활성 Transport에 명령 전달
-
-#### Data Model (`BrainWaveData.kt`)
-- `signalQuality: SignalQuality` — `poorSignal == 200`→NO_SIGNAL, `> 50`→POOR, `> 0`→FAIR, `== 0`→GOOD
-
-#### Simulator (`SimulatorTransport.kt`)
-- `Mode.FOCUSED`: Attention 70~100, Meditation 40~60, Delta 10k~50k, Beta 15k~40k
-- `Mode.RELAXED`: Attention 20~50, Meditation 70~100, Delta 20k~80k, Alpha 10k~30k
-- `Mode.POOR_SIGNAL`: PoorSignal 150~200, Attention/Meditation = 0
-- `Mode.RANDOM`: 전 필드 랜덤, PoorSignal 0~30
-- 1초 주기 emit, `setMode()` 호출 시 다음 emit부터 즉시 반영
-
-#### Constants (`NeuroSkyUUID.kt`, `NeuroSkyCommand.kt`)
-- eSense UUID: `039afff8-2c94-11e3-9e06-0002a5d5c51b`
-- Handshake UUID: `039affa0-2c94-11e3-9e06-0002a5d5c51b`
-- RawEEG UUID: `039afff4-2c94-11e3-9e06-0002a5d5c51b`
-- CCCD UUID: `00002902-0000-1000-8000-00805f9b34fb`
-- `START_ESENSE=0x17`, `STOP_ESENSE=0x18`, `START_RAW_EEG=0x15`, `STOP_RAW_EEG=0x16`
-- `NOTCH_50HZ=0x1B`(중국/유럽), `NOTCH_60HZ=0x1C`(한국/미국)
+## [Unreleased]
 
 ### Removed
-- `ThinkGearConnector` 클래스 (TCP 소켓 기반)
-- `TGCService` — PC 데몬 의존 TCP 통신 레이어
-- Java 기반 레거시 API 전체
-
----
-
-## [2.0.1] — 2026-04-09
+- Bluetooth Classic transport (BLE-only from v7.0.0)
 
 ### Added
+- eyeBlink parsing
 
-#### `NeuroSkySdk.findDeviceAddress()` (`NeuroSkySdk.kt`)
-- BLE 스캔으로 디바이스 이름에 `deviceName`을 포함하는 기기의 MAC 주소를 반환하는 suspend 함수 추가
-- `withTimeoutOrNull(timeoutMs)` + `suspendCancellableCoroutine` 조합으로 타임아웃·취소 안전 처리
-- `ScanCallback.onScanResult`에서 이름 매칭 즉시 `scanner.stopScan()` 호출 — 불필요한 스캔 지속 방지
-- 반환값 `String?` — 타임아웃 시 null, 호출자가 SharedPreferences 등에 캐시해 재사용 권장
+## [7.0.0] - TBD
 
-#### `sdk/consumer-rules.pro` (신규 파일)
-- `BluetoothGattCallback` 구현체 5개 메서드 명시적 보호:
-  `onConnectionStateChange`, `onServicesDiscovered`, `onDescriptorWrite`,
-  `onCharacteristicChanged` (API ≤32 / API 33+ 오버로드 각각)
-- `ScanCallback.onScanResult`, `onScanFailed` 보호 — `findDeviceAddress` 내 익명 클래스 대상
-- 공개 API 클래스 전체 (`NeuroSkySdk`, `NeuroSkyUUID`, `NeuroSkyCommand`, `Transport`,
-  `ConnectionState`, `BrainWaveData`, `SignalQuality`, `ThinkGearParser`, `SimulatorTransport`)
-- `sdk/build.gradle.kts`의 `consumerProguardFiles("consumer-rules.pro")`로 소비자 앱에 자동 적용
+First release of the renewed MindWave SDK line for Android.
+
+### Added
+- `NeuroSkySdk` entry point: `connect(deviceAddress, transport)`, `disconnect()`, `sendCommand(cmd)`, `dataFlow`, `connectionState`
+- `findDeviceAddress(deviceName)` to look up a headset's MAC address with a BLE scan
+- BLE transport (default) with reliable, serialized GATT writes: `sendCommand()` suspends until the headset acknowledges the write and throws on failure
+- Bluetooth Classic (SPP) transport, selected explicitly with `TransportType.BT_CLASSIC` (no automatic fallback)
+- `ThinkGearParser` for BLE eSense (`0xEA`/`0xEB`/`0xEC`), Raw EEG, and ThinkGear serial packets
+- `BrainWaveData` model with eSense values, eight EEG bands, Raw EEG (512 Hz), and derived `signalQuality`
+- `SimulatorTransport` (`RANDOM` / `FOCUSED` / `RELAXED` / `POOR_SIGNAL`) for development without a headset
+- `NeuroSkyCommand` constants for eSense, Raw EEG, and 50/60 Hz notch filter control
+- Consumer ProGuard/R8 rules shipped with the AAR
+- `LICENSE` (Apache License 2.0) and `NOTICE`
+- `jitpack.yml` pinning the JitPack build to JDK 17
 
 ### Changed
+- Version scheme realigned with the MindWave SDK line (legacy 4.x)
+- The published version now comes from the Git tag instead of a hard-coded value
 
-#### JitPack 배포 (`settings.gradle.kts`)
-- `dependencyResolutionManagement.repositories`에 `maven { url = uri("https://jitpack.io") }` 추가
-- `groupId = "com.github.nsk-bci"`, `artifactId = "mindwave-sdk-android"` 로 Maven 좌표 확정
-
-#### Sample 앱 UI (`sample/`)
-- `activity_main.xml` 전면 재작성 — 기존 단순 4× `TextView` → MaterialCardView 기반 4-카드 대시보드
-  - **Signal Status 카드**: 신호 품질별 색상 도트 + GOOD/FAIR/POOR/NO SIGNAL 텍스트
-  - **eSense 카드**: Attention / Meditation 수치 + 색상별 `ProgressBar` (max=100)
-  - **EEG Bands 카드**: δθαβγ 8밴드 각각 색상별 `ProgressBar` (max=100,000) + 실수치
-  - **Simulator Mode 카드**: RANDOM / FOCUSED / RELAXED / POOR SIGNAL 버튼, 선택 상태 하이라이트
-- `MainActivity.kt` ViewBinding으로 전환, `SimulatorTransport.setMode()` 실시간 전환 지원
-- `res/values/themes.xml` 추가 — `Theme.MaterialComponents.Light.NoActionBar` 기반
-- `res/values/colors.xml` 추가 — signalGood `#2E7D32`, signalFair `#E65100`, signalPoor `#C62828` 등
-- `res/drawable/bg_signal_dot.xml` 추가 — 신호 품질 도트용 oval drawable
-
-#### README
-- Developer Guide PDF 링크를 `## Getting Started` 상단으로 이동 (기존: 섹션 하단 footnote)
-- Step 4 개편 — `connect(address)` 사용법 + `findDeviceAddress()` 캐시 패턴 예제 추가
-- ProGuard / R8 섹션 신규 추가 — 릴리즈 빌드 무음 실패 증상 및 최소 규칙 명시
-- Troubleshooting 섹션 신규 추가 — JitPack 빌드 실패 4가지 원인·해결책
-- Working with dataFlow 섹션 신규 추가 — 패킷 타이밍 표, `filter { attention > 0 }` 안티패턴 및 올바른 3가지 패턴
-
-### Fixed
-
-#### `BleTransport` / `BtClassicTransport` — dataFlow lifecycle decoupled from connection
-- `callbackFlow`를 `MutableSharedFlow(extraBufferCapacity = 64)`로 교체
-- GATT 연결·소켓 수명이 이제 `connect()`/`disconnect()`로만 제어됨 — `dataFlow` 수집 중단이 BLE 연결을 닫지 않음
-- `BtClassicTransport`: 전용 `readLoop` coroutine + `SupervisorJob` 스코프로 재작성, 소켓 에러 시 `stateFlow`로 상태 전파
-
-#### `ThinkGearParser` — BT Classic `0x83` bounds guard
-- `parseByte()` 내 `0x83` (EEG Power 24바이트) 분기에서 `len` 바이트 읽기 전 `if (i >= payload.size) break` 추가
-- 이전에는 잘려진 페이로드에서 `IndexOutOfBoundsException` 발생 가능
-
-#### 문서 정정
-- README / developer-guide의 `TransportMode.BT_CLASSIC` → `TransportType.BT_CLASSIC` 수정
-- `SimulatorTransport`의 `stateFlow: Flow<ConnectionState>` API 명확화 — `connectionState`는 `NeuroSkySdk` 전용 래퍼
-- EEG 밴드 필드명 `lowAlpha/highAlpha` 형식 명시 (`alphaLow/alphaHigh` 아님)
-- `dataFlow` 수집 타이밍 가이드 추가 — `connect()` 완료 이전 캡처 시 idle Transport flow 구독 위험 안내
-- BLE→BT Classic 자동 폴백 없음 명시 — `connect()`는 전달한 `TransportType` 하나만 사용
+### Removed
+- `publish.yml` ("Publish to Maven Central"): the SDK is distributed via JitPack, which builds on demand from tags
+- Developer guide PDFs: superseded by [`docs/developer-guide.md`](docs/developer-guide.md)
