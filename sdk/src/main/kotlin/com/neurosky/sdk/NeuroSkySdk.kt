@@ -58,15 +58,10 @@ class NeuroSkySdk(private val context: Context) {
      * [NeuroSkySdk] 전용 래퍼로, 내부 트랜스포트의 [Transport.stateFlow]를 구독해
      * 상태 변화를 이 프로퍼티에 미러링한다.
      *
-     * **직접 Transport를 사용할 때는 이 프로퍼티 대신 [Transport.stateFlow]를 구독할 것.**
-     * [SimulatorTransport] 등 [Transport] 구현체는 `connectionState`를 노출하지 않는다.
+     * [Transport] 구현체는 `connectionState`를 노출하지 않는다 — 직접 쓸 때는 [Transport.stateFlow]를 구독할 것.
      *
      * ```kotlin
-     * // NeuroSkySdk 사용 시
      * sdk.connectionState.collect { state -> ... }
-     *
-     * // Transport 직접 사용 시
-     * simulatorTransport.stateFlow.collect { state -> ... }
      * ```
      */
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()

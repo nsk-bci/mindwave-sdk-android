@@ -31,7 +31,3 @@
 
 # ── Parser ────────────────────────────────────────────────────────────────────
 -keep class com.neurosky.sdk.parser.ThinkGearParser { *; }
-
-# ── Simulator ─────────────────────────────────────────────────────────────────
--keep class com.neurosky.sdk.simulator.SimulatorTransport { *; }
--keep class com.neurosky.sdk.simulator.SimulatorTransport$Mode { *; }

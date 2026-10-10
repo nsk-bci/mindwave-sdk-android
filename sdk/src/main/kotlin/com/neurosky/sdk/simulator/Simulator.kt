@@ -10,14 +10,17 @@ import kotlinx.coroutines.flow.flow
 import kotlin.random.Random
 
 /**
- * 실기기 없이 개발할 때 사용하는 시뮬레이터 Transport.
- * 1초마다 BrainWaveData를 자동 생성한다.
+ * 테스트 전용 시뮬레이터 Transport. 1초마다 BrainWaveData를 생성한다.
+ *
+ * internal — SDK 모듈의 단위 테스트에서만 쓴다. 고정 시드 난수를 쓰므로 같은 시드와 모드는
+ * 항상 같은 값 순서를 만든다.
  */
-class SimulatorTransport : Transport {
+internal class SimulatorTransport(seed: Long = DEFAULT_SEED) : Transport {
 
     enum class Mode { RANDOM, FOCUSED, RELAXED, POOR_SIGNAL }
 
     private var mode = Mode.RANDOM
+    private val random = Random(seed)
     private val _stateFlow = MutableStateFlow(ConnectionState.DISCONNECTED)
 
     /**
@@ -62,54 +65,59 @@ class SimulatorTransport : Transport {
         // 시뮬레이터에서는 명령을 무시
     }
 
-    private fun generateData(): BrainWaveData = when (mode) {
+    /** 테스트에서 1초 지연 없이 값을 뽑을 수 있도록 internal. */
+    internal fun generateData(): BrainWaveData = when (mode) {
         Mode.FOCUSED -> BrainWaveData(
             poorSignal  = 0,
-            attention   = Random.nextInt(70, 100),
-            meditation  = Random.nextInt(40, 60),
-            delta       = Random.nextInt(10_000, 50_000),
-            theta       = Random.nextInt(5_000, 20_000),
-            lowAlpha    = Random.nextInt(3_000, 10_000),
-            highAlpha   = Random.nextInt(3_000, 10_000),
-            lowBeta     = Random.nextInt(15_000, 40_000),
-            highBeta    = Random.nextInt(10_000, 30_000),
-            lowGamma    = Random.nextInt(5_000, 15_000),
-            midGamma    = Random.nextInt(5_000, 15_000),
-            rawEeg      = List(10) { Random.nextInt(-2048, 2048) }
+            attention   = random.nextInt(70, 100),
+            meditation  = random.nextInt(40, 60),
+            delta       = random.nextInt(10_000, 50_000),
+            theta       = random.nextInt(5_000, 20_000),
+            lowAlpha    = random.nextInt(3_000, 10_000),
+            highAlpha   = random.nextInt(3_000, 10_000),
+            lowBeta     = random.nextInt(15_000, 40_000),
+            highBeta    = random.nextInt(10_000, 30_000),
+            lowGamma    = random.nextInt(5_000, 15_000),
+            midGamma    = random.nextInt(5_000, 15_000),
+            rawEeg      = List(10) { random.nextInt(-2048, 2048) }
         )
         Mode.RELAXED -> BrainWaveData(
             poorSignal  = 0,
-            attention   = Random.nextInt(20, 50),
-            meditation  = Random.nextInt(70, 100),
-            delta       = Random.nextInt(20_000, 80_000),
-            theta       = Random.nextInt(15_000, 40_000),
-            lowAlpha    = Random.nextInt(10_000, 30_000),
-            highAlpha   = Random.nextInt(10_000, 30_000),
-            lowBeta     = Random.nextInt(3_000, 10_000),
-            highBeta    = Random.nextInt(3_000, 10_000),
-            lowGamma    = Random.nextInt(2_000, 8_000),
-            midGamma    = Random.nextInt(2_000, 8_000),
-            rawEeg      = List(10) { Random.nextInt(-1024, 1024) }
+            attention   = random.nextInt(20, 50),
+            meditation  = random.nextInt(70, 100),
+            delta       = random.nextInt(20_000, 80_000),
+            theta       = random.nextInt(15_000, 40_000),
+            lowAlpha    = random.nextInt(10_000, 30_000),
+            highAlpha   = random.nextInt(10_000, 30_000),
+            lowBeta     = random.nextInt(3_000, 10_000),
+            highBeta    = random.nextInt(3_000, 10_000),
+            lowGamma    = random.nextInt(2_000, 8_000),
+            midGamma    = random.nextInt(2_000, 8_000),
+            rawEeg      = List(10) { random.nextInt(-1024, 1024) }
         )
         Mode.POOR_SIGNAL -> BrainWaveData(
-            poorSignal  = Random.nextInt(150, 200),
+            poorSignal  = random.nextInt(150, 200),
             attention   = 0,
             meditation  = 0,
-            rawEeg      = List(10) { Random.nextInt(-4096, 4096) }
+            rawEeg      = List(10) { random.nextInt(-4096, 4096) }
         )
         Mode.RANDOM -> BrainWaveData(
-            poorSignal  = Random.nextInt(0, 30),
-            attention   = Random.nextInt(0, 100),
-            meditation  = Random.nextInt(0, 100),
-            delta       = Random.nextInt(0, 100_000),
-            theta       = Random.nextInt(0, 100_000),
-            lowAlpha    = Random.nextInt(0, 50_000),
-            highAlpha   = Random.nextInt(0, 50_000),
-            lowBeta     = Random.nextInt(0, 50_000),
-            highBeta    = Random.nextInt(0, 50_000),
-            lowGamma    = Random.nextInt(0, 30_000),
-            midGamma    = Random.nextInt(0, 30_000),
-            rawEeg      = List(10) { Random.nextInt(-2048, 2048) }
+            poorSignal  = random.nextInt(0, 30),
+            attention   = random.nextInt(0, 100),
+            meditation  = random.nextInt(0, 100),
+            delta       = random.nextInt(0, 100_000),
+            theta       = random.nextInt(0, 100_000),
+            lowAlpha    = random.nextInt(0, 50_000),
+            highAlpha   = random.nextInt(0, 50_000),
+            lowBeta     = random.nextInt(0, 50_000),
+            highBeta    = random.nextInt(0, 50_000),
+            lowGamma    = random.nextInt(0, 30_000),
+            midGamma    = random.nextInt(0, 30_000),
+            rawEeg      = List(10) { random.nextInt(-2048, 2048) }
         )
+    }
+
+    companion object {
+        const val DEFAULT_SEED = 7L
     }
 }

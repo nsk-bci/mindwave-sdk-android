@@ -107,37 +107,6 @@ That's it — four steps from zero to streaming EEG data.
 | Device pairing | Not required |
 | Headset | MindWave Mobile 2 (MindWave Mobile 1st gen and third-party TGAM boards are not supported) |
 
-## Simulator (without a real device)
-
-```kotlin
-import com.neurosky.sdk.simulator.SimulatorTransport  // package: simulator, not transport
-
-val simulator = SimulatorTransport()
-simulator.setMode(SimulatorTransport.Mode.FOCUSED)
-
-lifecycleScope.launch {
-    simulator.connect("simulator")
-
-    // Connection state: SimulatorTransport exposes stateFlow (Transport interface).
-    // connectionState (StateFlow) is only available on NeuroSkySdk.
-    simulator.stateFlow.collect { state -> /* CONNECTED after ~500 ms */ }
-}
-
-// Separate coroutine to collect data
-lifecycleScope.launch {
-    simulator.dataFlow.collect { data ->
-        println("Attention: ${data.attention}")
-    }
-}
-```
-
-| Mode | Attention | Meditation | Use case |
-|---|---|---|---|
-| `RANDOM` | 0~100 (random) | 0~100 (random) | General testing |
-| `FOCUSED` | 70~100 | 40~60 | Focused state UI testing |
-| `RELAXED` | 20~50 | 70~100 | Relaxed state UI testing |
-| `POOR_SIGNAL` | 0 | 0 | Signal loss / error handling test |
-
 ## BrainWaveData
 
 | Property | Type | Range | Description |
@@ -243,7 +212,6 @@ sdk.sendCommand(NeuroSkyCommand.STOP_RAW_EEG)
 | Transport | Method | Requirement |
 |---|---|---|
 | `BleTransport` | BLE GATT | Android 6.0+, BLE adapter |
-| `SimulatorTransport` | Virtual data | For development/testing |
 
 ## ProGuard / R8
 
@@ -276,10 +244,8 @@ sdk/src/main/kotlin/com/neurosky/sdk/
 ├── transport/
 │   ├── Transport.kt            Common interface, ConnectionState enum
 │   └── BleTransport.kt         Android BLE GATT implementation
-├── parser/
-│   └── ThinkGearParser.kt      ThinkGear packet parser
-└── simulator/
-    └── SimulatorTransport.kt   Simulator for development
+└── parser/
+    └── ThinkGearParser.kt      ThinkGear packet parser
 ```
 
 ## Troubleshooting

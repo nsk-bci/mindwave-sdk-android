@@ -1,10 +1,13 @@
 package com.neurosky.sample
 
+import android.app.Application
+import android.content.Context
 import android.os.Environment
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.neurosky.sdk.NeuroSkyCommand
+import com.neurosky.sdk.NeuroSkySdk
 import com.neurosky.sdk.model.BrainWaveData
-import com.neurosky.sdk.simulator.SimulatorTransport
 import com.neurosky.sdk.transport.ConnectionState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -21,17 +24,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val MAX_ATTEMPTS = 5
         private const val MAX_DELAY_SECONDS = 30L
+        private const val PREFS = "neurosky_sample"
+        private const val KEY_DEVICE_ADDRESS = "device_address"
     }
 
-    private val simulator = SimulatorTransport()
+    private val sdk = NeuroSkySdk(application)
+    private val prefs = application.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    /** 수집 시작 후 1초마다 BrainWaveData를 emit한다. */
-    val brainWaveData: Flow<BrainWaveData> = simulator.dataFlow
+    /** eSense(~1초)와 Raw EEG 패킷이 도착할 때마다 BrainWaveData를 emit한다. */
+    val brainWaveData: Flow<BrainWaveData> = sdk.dataFlow
 
     sealed class ReconnectState {
         object Idle : ReconnectState()
@@ -61,13 +67,15 @@ class MainViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            simulator.stateFlow.collect { state ->
+            sdk.connectionState.collect { state ->
                 if (!sessionStarted) return@collect
                 when (state) {
                     ConnectionState.CONNECTED -> {
                         reconnectJob?.cancel()
                         savedAttempt = 0
                         _reconnectState.value = ReconnectState.Connected
+                        // 전원 노이즈 제거 — 한국/미국 60Hz (유럽/중국은 NOTCH_50HZ)
+                        launch { runCatching { sdk.sendCommand(NeuroSkyCommand.NOTCH_60HZ) } }
                     }
                     ConnectionState.DISCONNECTED, ConnectionState.ERROR -> {
                         val current = _reconnectState.value
@@ -88,7 +96,7 @@ class MainViewModel : ViewModel() {
     fun startSession() {
         sessionStarted = true
         viewModelScope.launch {
-            runCatching { simulator.connect("simulator") }
+            runCatching { connectHeadset() }
                 .onFailure { e ->
                     if (e !is CancellationException) launchReconnectLoop(fromAttempt = 1)
                 }
@@ -110,7 +118,7 @@ class MainViewModel : ViewModel() {
                 delay(delaySeconds * 1_000L)
                 if (!isActive) return@launch
 
-                runCatching { simulator.connect("simulator") }
+                runCatching { connectHeadset() }
                 // 성공: stateFlow → CONNECTED → init observer가 상태 갱신 & 이 job 취소
                 // 실패: 다음 attempt로 진행
             }
@@ -151,8 +159,16 @@ class MainViewModel : ViewModel() {
         reconnectJob?.cancel()
     }
 
-    fun setSimulatorMode(mode: SimulatorTransport.Mode) {
-        simulator.setMode(mode)
+    /**
+     * 캐시된 MAC 주소로 연결한다. 캐시가 없으면 BLE 스캔으로 "MindWave Mobile"을 찾아 저장한다.
+     * 기기를 못 찾으면 예외 → 재연결 루프가 다시 시도한다.
+     */
+    private suspend fun connectHeadset() {
+        val address = prefs.getString(KEY_DEVICE_ADDRESS, null)
+            ?: sdk.findDeviceAddress("MindWave Mobile")
+                ?.also { prefs.edit().putString(KEY_DEVICE_ADDRESS, it).apply() }
+            ?: throw IllegalStateException("MindWave Mobile not found — is it on and nearby?")
+        sdk.connect(address)
     }
 
     // ── CSV Recording ─────────────────────────────────────────────

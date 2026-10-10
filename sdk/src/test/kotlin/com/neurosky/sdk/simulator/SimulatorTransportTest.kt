@@ -164,4 +164,43 @@ class SimulatorTransportTest {
         assertEquals(4, states.size)
         assertEquals(ConnectionState.DISCONNECTED, states.last())
     }
+
+    // ── Determinism (fixed seed) ─────────────────────────────────────────────
+
+    private fun draw(mode: SimulatorTransport.Mode, seed: Long = SimulatorTransport.DEFAULT_SEED) =
+        SimulatorTransport(seed).run {
+            setMode(mode)
+            List(200) { generateData() }
+        }
+
+    @Test
+    fun sameSeed_producesIdenticalSequence() {
+        val a = draw(SimulatorTransport.Mode.RANDOM)
+        val b = draw(SimulatorTransport.Mode.RANDOM)
+        assertEquals(a.map { it.attention }, b.map { it.attention })
+        assertEquals(a.flatMap { it.rawEeg }, b.flatMap { it.rawEeg })
+    }
+
+    @Test
+    fun differentSeed_producesDifferentSequence() {
+        val a = draw(SimulatorTransport.Mode.RANDOM, seed = 1)
+        val b = draw(SimulatorTransport.Mode.RANDOM, seed = 2)
+        assertTrue(a.map { it.attention } != b.map { it.attention })
+    }
+
+    @Test
+    fun allModes_stayInRange_over200Samples() {
+        draw(SimulatorTransport.Mode.FOCUSED).forEach {
+            assertTrue(it.attention in 70..99 && it.meditation in 40..59 && it.poorSignal == 0)
+        }
+        draw(SimulatorTransport.Mode.RELAXED).forEach {
+            assertTrue(it.attention in 20..49 && it.meditation in 70..99 && it.poorSignal == 0)
+        }
+        draw(SimulatorTransport.Mode.POOR_SIGNAL).forEach {
+            assertTrue(it.poorSignal in 150..199 && it.attention == 0 && it.meditation == 0)
+        }
+        draw(SimulatorTransport.Mode.RANDOM).forEach {
+            assertTrue(it.poorSignal in 0..29 && it.rawEeg.size == 10 && it.rawEeg.all { v -> v in -2048..2047 })
+        }
+    }
 }

@@ -12,6 +12,8 @@ Releases before 7.0.0 are documented in the [legacy changelog (v2.0.5)](https://
 - Bluetooth Classic transport (BLE-only from v7.0.0): `BtClassicTransport`, `TransportType`,
   the `transport` argument of `NeuroSkySdk.connect()`, `NeuroSkyUUID.SPP`, and
   `ThinkGearParser.parseByte()` (ThinkGear serial stream)
+- `SimulatorTransport` from the public API: it is now internal and test-only (deterministic, fixed seed).
+  The sample app connects to a real headset.
 
 ### Changed
 - `BLUETOOTH`, `BLUETOOTH_ADMIN`, and `ACCESS_FINE_LOCATION` are declared with `maxSdkVersion="30"`,
@@ -30,7 +32,6 @@ First release of the renewed MindWave SDK line for Android.
 - BLE transport with reliable, serialized GATT writes: `sendCommand()` suspends until the headset acknowledges the write and throws on failure
 - `ThinkGearParser` for BLE eSense (`0xEA`/`0xEB`/`0xEC`) and Raw EEG packets
 - `BrainWaveData` model with eSense values, eight EEG bands, Raw EEG (512 Hz), and derived `signalQuality`
-- `SimulatorTransport` (`RANDOM` / `FOCUSED` / `RELAXED` / `POOR_SIGNAL`) for development without a headset
 - `NeuroSkyCommand` constants for eSense, Raw EEG, and 50/60 Hz notch filter control
 - Consumer ProGuard/R8 rules shipped with the AAR
 - `LICENSE` (Apache License 2.0) and `NOTICE`
