@@ -2,7 +2,7 @@
 
 ## NeuroSkySdk
 
-진입점 클래스. BLE + BT Classic 연결을 추상화한다.
+진입점 클래스. MindWave Mobile 2와의 BLE 연결을 관리한다.
 
 ```kotlin
 class NeuroSkySdk(context: Context)
@@ -12,7 +12,7 @@ class NeuroSkySdk(context: Context)
 |---|---|---|
 | `connectionState` | `StateFlow<ConnectionState>` | 현재 연결 상태 (NeuroSkySdk 전용; Transport 직접 사용 시에는 `stateFlow` 사용) |
 | `dataFlow` | `Flow<BrainWaveData>` | 실시간 뇌파 데이터 스트림 — `connect()` 이후에 수집할 것 |
-| `connect(deviceAddress, transport)` | `suspend fun` | 지정한 `TransportType`으로 연결. 기본값 `TransportType.BLE`. 자동 폴백 없음 |
+| `connect(deviceAddress)` | `suspend fun` | BLE로 연결 |
 | `disconnect()` | `suspend fun` | 연결 해제 |
 | `sendCommand(cmd: Byte)` | `suspend fun` | 헤드셋에 명령 전송 |
 | `findDeviceAddress(deviceName, timeoutMs)` | `suspend fun` | BLE 스캔으로 MAC 주소 반환. 타임아웃 시 null |
@@ -20,9 +20,6 @@ class NeuroSkySdk(context: Context)
 > **dataFlow 타이밍 주의:** `sdk.dataFlow`는 호출 시점의 activeTransport 를 반환하는 getter입니다.  
 > `connect()` 호출 전에 캡처하면 idle 상태의 Transport flow를 구독하게 됩니다.  
 > 반드시 `connect()` 완료 후 같은 coroutine 안에서 collect하세요.
-
-> **TransportType vs TransportMode:** 정확한 열거형 이름은 `TransportType` (`BLE`, `BT_CLASSIC`)입니다.  
-> `TransportMode`는 이전 문서의 오타이며 실제 API에 존재하지 않습니다.
 
 ---
 
@@ -84,20 +81,7 @@ interface Transport {
 }
 ```
 
-구현체: `BleTransport`, `BtClassicTransport`, `SimulatorTransport`
-
----
-
-## TransportType
-
-```kotlin
-enum class TransportType { BLE, BT_CLASSIC }
-```
-
-| 값 | 설명 |
-|---|---|
-| `BLE` | BLE 연결 (기본값) |
-| `BT_CLASSIC` | BT Classic SPP 연결 (명시적 선택) |
+구현체: `BleTransport`, `SimulatorTransport`
 
 ---
 
@@ -137,7 +121,6 @@ object NeuroSkyUUID
 | `HANDSHAKE` | 039affa0-... | 핸드셰이크/명령 특성 |
 | `RAW_EEG` | 039afff4-... | Raw EEG 특성 |
 | `CCCD` | 00002902-... | Client Characteristic Config Descriptor |
-| `SPP` | 00001101-... | BT Classic RFCOMM |
 
 ---
 

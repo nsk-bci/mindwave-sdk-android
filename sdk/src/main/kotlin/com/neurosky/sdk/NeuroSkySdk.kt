@@ -6,7 +6,6 @@ import android.bluetooth.le.ScanResult
 import android.content.Context
 import com.neurosky.sdk.model.BrainWaveData
 import com.neurosky.sdk.transport.BleTransport
-import com.neurosky.sdk.transport.BtClassicTransport
 import com.neurosky.sdk.transport.ConnectionState
 import com.neurosky.sdk.transport.Transport
 import kotlinx.coroutines.CoroutineScope
@@ -20,23 +19,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 연결에 사용할 트랜스포트 종류. */
-enum class TransportType { BLE, BT_CLASSIC }
-
 /**
  * NeuroSky MindWave SDK 진입점.
  *
- * 기본 트랜스포트는 BLE이며, BT Classic은 [TransportType.BT_CLASSIC]으로 명시해야 한다.
+ * MindWave Mobile 2와 BLE로만 통신한다.
  *
  * ```kotlin
  * val sdk = NeuroSkySdk(context)
  *
  * lifecycleScope.launch {
- *     // BLE 연결 (기본) — MAC 주소 필요. findDeviceAddress()로 조회 가능
+ *     // BLE 연결 — MAC 주소 필요. findDeviceAddress()로 조회 가능
  *     sdk.connect("AA:BB:CC:DD:EE:FF")
- *
- *     // BT Classic 연결 (명시적 선택)
- *     // sdk.connect("AA:BB:CC:DD:EE:FF", TransportType.BT_CLASSIC)
  *
  *     sdk.dataFlow.collect { data ->
  *         println("Attention: ${data.attention}")
@@ -49,14 +42,13 @@ class NeuroSkySdk(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val bleTransport = BleTransport(context)
-    private val btTransport  = BtClassicTransport()
 
     /** BLE 내부 로그를 UI로 전달하는 콜백 설정 */
     fun setLogger(log: (String) -> Unit) {
         bleTransport.logger = log
     }
 
-    private var activeTransport: Transport = bleTransport
+    private val activeTransport: Transport = bleTransport
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
 
@@ -85,13 +77,8 @@ class NeuroSkySdk(private val context: Context) {
      * 디바이스에 연결한다.
      *
      * @param deviceAddress Bluetooth MAC 주소 (예: "AA:BB:CC:DD:EE:FF"). [findDeviceAddress]로 이름→주소 변환 가능
-     * @param transport     사용할 트랜스포트. 기본값은 [TransportType.BLE]
      */
-    suspend fun connect(deviceAddress: String, transport: TransportType = TransportType.BLE) {
-        activeTransport = when (transport) {
-            TransportType.BLE        -> bleTransport
-            TransportType.BT_CLASSIC -> btTransport
-        }
+    suspend fun connect(deviceAddress: String) {
         activeTransport.connect(deviceAddress)
 
         scope.launch {

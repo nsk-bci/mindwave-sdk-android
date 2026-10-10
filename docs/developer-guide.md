@@ -43,7 +43,7 @@ This SDK eliminates TGC entirely by communicating directly with the MindWave Mob
 | Feature | Description |
 |---|---|
 | No TGC dependency | Communicates with hardware directly via Android Bluetooth APIs |
-| BLE + BT Classic | BLE by default; BT Classic available for noisy RF environments |
+| BLE only | No pairing required; Bluetooth Classic is not supported |
 | Kotlin Coroutines & Flow | `Flow<BrainWaveData>` — integrates naturally with Jetpack lifecycle |
 | Built-in Simulator | Full data simulation without any hardware |
 | JitPack distribution | One-line Gradle dependency, no local setup |
@@ -70,7 +70,7 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
 │  ThinkGear ASIC chip                     │
 │    → raw ADC samples (512Hz)             │
 │    → computes FFT + eSense™ internally   │
-│    → transmits via BLE or BT Classic     │
+│    → transmits via BLE                   │
 └────────────────┬─────────────────────────┘
                  │ Bluetooth packets
         ┌────────▼────────┐
@@ -85,9 +85,6 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
         │   ├── BleTransport                      │
         │   │    Android BLE GATT                 │
         │   │    (BluetoothGatt + callbacks)       │
-        │   ├── BtClassicTransport                │
-        │   │    RFCOMM SPP socket                │
-        │   │    (BluetoothSocket InputStream)    │
         │   └── SimulatorTransport               │
         │        (virtual data, no hardware)      │
         │          ↓                              │
@@ -104,21 +101,9 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
                 └─────────────────┘
 ```
 
-### BLE vs BT Classic — internal differences
+### BLE data path
 
-**BLE (Bluetooth Low Energy) path:**
-The MindWave Mobile exposes three BLE GATT characteristics. The SDK subscribes to notifications on the eSense and RawEEG characteristics, then writes the handshake command byte to start data flow. No Android pairing is required.
-
-**BT Classic (RFCOMM SPP) path:**
-The MindWave Mobile emulates a serial port (SPP UUID `00001101-...`). The SDK opens a `BluetoothSocket` and reads a continuous byte stream. `ThinkGearParser` synchronizes on the `0xAA 0xAA` sync header. The device must be paired in Android Bluetooth settings first.
-
-Both paths produce identical `BrainWaveData` output through the same `dataFlow`.
-
-### BLE default — no automatic fallback
-
-`NeuroSkySdk.connect()` uses BLE by default. To use BT Classic instead, pass `TransportType.BT_CLASSIC` to `connect()`. Both transports produce the same `dataFlow` output.
-
-> `NeuroSkySdk` does **not** attempt BLE first and then fall back to BT Classic automatically. The transport you pass to `connect()` is the only transport used. If you need fallback logic, implement it yourself in the caller.
+The MindWave Mobile 2 exposes three BLE GATT characteristics. The SDK subscribes to notifications on the eSense and RawEEG characteristics, then writes the handshake command byte to start data flow. No Android pairing is required.
 
 ---
 
@@ -131,12 +116,12 @@ Both paths produce identical `BrainWaveData` output through the same `dataFlow`.
 | Android OS | Android 6.0 (API level 23) |
 | Kotlin | 1.9+ |
 | Coroutines | `kotlinx-coroutines-android` 1.7+ |
-| Bluetooth | BLE adapter (for BLE mode) or Classic BT (for BT Classic mode) |
-| Pairing | Not required for BLE; required for BT Classic |
+| Bluetooth | BLE adapter |
+| Pairing | Not required |
 
 ### Supported headset
 
-This SDK is designed and tested for the **NeuroSky MindWave Mobile 2**. Both BLE and BT Classic modes are supported.
+This SDK is designed and tested for the **NeuroSky MindWave Mobile 2** over BLE. MindWave Mobile 1st gen and third-party TGAM boards are not supported.
 
 ---
 
@@ -198,12 +183,15 @@ Android requires Bluetooth permissions in `AndroidManifest.xml`. The required pe
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
 <!-- Android 6.0–11 (API 23–30) -->
-<uses-permission android:name="android.permission.BLUETOOTH" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.BLUETOOTH"
+    android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+    android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+    android:maxSdkVersion="30" />
 ```
 
-> Adding all of the above covers all Android versions from 6.0 to 14+. The OS ignores permissions not applicable to the current version.
+> Adding all of the above covers all Android versions from 6.0 to 14+. `maxSdkVersion="30"` keeps the legacy permissions — including location — from being requested on Android 12+.
 
 ### Runtime permission request (Android 12+)
 
@@ -836,7 +824,6 @@ class EegForegroundService : Service() {
 |---|---|---|
 | `SecurityException` on `connect()` | Bluetooth permission not granted at runtime | Request `BLUETOOTH_SCAN` + `BLUETOOTH_CONNECT` (API 31+) or `ACCESS_FINE_LOCATION` (API 23–30) |
 | `connect()` hangs indefinitely | BLE scan timeout | Use `findDeviceAddress()` first to resolve the MAC address, then pass the MAC to `connect()` for faster connection. |
-| BT Classic connect fails | Device not paired | Open Android Settings → Bluetooth → pair "MindWave Mobile" manually |
 | Connection drops after a few minutes | Android BLE background scan kill | Use a Foreground Service to prevent the OS from killing the connection |
 | `dataFlow` stops emitting after screen off | Background execution limit | Same — use a Foreground Service |
 
@@ -857,7 +844,7 @@ class EegForegroundService : Service() {
 | `Could not resolve com.github.nsk-bci:mindwave-sdk-android` | JitPack not in repository list | Add `maven { url = uri("https://jitpack.io") }` to `settings.gradle.kts` |
 | `Unresolved reference: NeuroSkySdk` | Missing `import` | Add `import com.neurosky.sdk.NeuroSkySdk` |
 | `Unresolved reference: SimulatorTransport` | Wrong import | Use `import com.neurosky.sdk.simulator.SimulatorTransport` (package is `simulator`, not `transport`) |
-| `Unresolved reference: TransportMode` | Old doc typo | The correct enum is `TransportType`. Use `TransportType.BLE` / `TransportType.BT_CLASSIC` |
+| `Unresolved reference: TransportType` | Removed in v7.0.0 | The SDK is BLE-only. Call `connect(deviceAddress)` without a transport argument |
 | `Unresolved reference: connectionState` on simulator | Wrong API | `connectionState` belongs to `NeuroSkySdk`. Use `simulator.stateFlow` instead |
 | `Unresolved reference: alphaLow` / `betaHigh` | Wrong field name order | Field names are `lowAlpha`, `highAlpha`, `lowBeta`, `highBeta`, `lowGamma`, `midGamma` — modifier first |
 | First build very slow | JitPack building from source | Normal — only happens once; subsequent builds use cache |
@@ -874,7 +861,7 @@ class EegForegroundService : Service() {
 
 ## 15. Testing
 
-The SDK ships with a unit test suite for `ThinkGearParser` — the packet parser that runs identically on both BLE and BT Classic transports. These tests require no hardware or Bluetooth adapter and run on the JVM directly.
+The SDK ships with a unit test suite for `ThinkGearParser` — the BLE packet parser. These tests require no hardware or Bluetooth adapter and run on the JVM directly.
 
 ### Running the tests
 
@@ -900,9 +887,6 @@ sdk/build/reports/tests/testDebugUnitTest/index.html
 | `parseRawEeg_signedConversion` | Values > 32768 converted to negative |
 | `parseRawEeg_tooShort` | Short packet → returns null |
 | `parse_unknownUuid` | Unknown UUID → returns null |
-| `parseByte_validPacket` | BT Classic serial packet — Attention/Meditation |
-| `parseByte_invalidChecksum` | Wrong checksum → returns null |
-| `parseByte_poorSignalCode` | BT Classic PoorSignal (code 0x02) |
 | `signalQuality_*` | 200/100/25/0 → NO_SIGNAL/POOR/FAIR/GOOD |
 
 ### Test location
@@ -918,7 +902,7 @@ sdk/src/test/kotlin/com/neurosky/sdk/parser/
 
 ### `NeuroSkySdk`
 
-Main entry point. Manages BLE/BT Classic transport selection and lifecycle.
+Main entry point. Manages the BLE connection and its lifecycle.
 
 ```kotlin
 class NeuroSkySdk(context: Context)
@@ -928,14 +912,12 @@ class NeuroSkySdk(context: Context)
 |---|---|---|
 | `connectionState` | `StateFlow<ConnectionState>` | Current connection state; hot Flow, always has a value |
 | `dataFlow` | `Flow<BrainWaveData>` | Returns `activeTransport.dataFlow` at call time — collect **after** `connect()` |
-| `connect(deviceAddress, transport)` | `suspend fun` | Connects via the given `TransportType`. Default: `TransportType.BLE`. No automatic fallback |
+| `connect(deviceAddress)` | `suspend fun` | Connects over BLE |
 | `disconnect()` | `suspend fun` | Gracefully closes the active transport |
 | `sendCommand(cmd: Byte)` | `suspend fun` | Sends a control byte to the headset |
 | `findDeviceAddress(deviceName, timeoutMs)` | `suspend fun` | BLE scan returning MAC address, or null on timeout |
 
 > **`dataFlow` timing:** `sdk.dataFlow` is a property getter — each access returns the current `activeTransport.dataFlow`. Capturing `sdk.dataFlow` into a variable *before* `connect()` will bind the flow to the pre-connect transport state. Always collect inside the same coroutine that calls `connect()`, or after `connectionState` emits `CONNECTED`.
->
-> **`TransportType` not `TransportMode`:** The enum is `TransportType` with values `BLE` and `BT_CLASSIC`. `TransportMode` does not exist in the API.
 
 ---
 
@@ -994,7 +976,7 @@ Derived from `BrainWaveData.poorSignal`.
 
 ### `Transport` (interface)
 
-Common interface implemented by `BleTransport`, `BtClassicTransport`, and `SimulatorTransport`.
+Common interface implemented by `BleTransport` and `SimulatorTransport`.
 
 ```kotlin
 interface Transport {
